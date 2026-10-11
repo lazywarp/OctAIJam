@@ -92,6 +92,13 @@ func _ready() -> void:
 	hud.main = self
 	hud_layer.add_child(hud)
 
+	# For testing: `godot --path . -- --level 5` skips the title and starts at that level.
+	var args := OS.get_cmdline_user_args()
+	var at := args.find("--level")
+	if at >= 0 and at + 1 < args.size():
+		_start_game()
+		_load_level(clampi(args[at + 1].to_int() - 1, 0, level_count() - 1), true)
+
 
 func _setup_input() -> void:
 	_add_action("move_left", [KEY_LEFT, KEY_A], [JOY_BUTTON_DPAD_LEFT], -1.0)
@@ -229,8 +236,9 @@ func beat_group_active(group: int) -> bool:
 
 ## The metronome swing, -1..1, at an extreme on every tick. The background arm and
 ## pendulum platforms both read it, so they can never drift apart.
-func swing(offset := 0.0) -> float:
-	return cos(PI * (beat + beat_phase + offset))
+## beats_per_side > 1 slows the swing: 2 means one extreme every other tick.
+func swing(offset := 0.0, beats_per_side := 1.0) -> float:
+	return cos(PI * (beat + beat_phase + offset) / beats_per_side)
 
 
 # --- Beat & music -----------------------------------------------------------
@@ -338,7 +346,7 @@ func _load_level(i: int, announce: bool) -> void:
 		_add_platform(PlatformScript.Kind.BEAT_B, r)
 	for pd in level.get("pend", []):
 		var pn := PendulumScript.new()
-		pn.setup(self, pd[0], pd[1], pd[2], pd[3])
+		pn.setup(self, pd[0], pd[1], pd[2], pd[3], float(pd[4]) if pd.size() > 4 else 1.0)
 		world.add_child(pn)
 	for r in level.get("hot", []):
 		var hz := HazardScript.new()

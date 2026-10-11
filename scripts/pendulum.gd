@@ -10,12 +10,14 @@ var pivot := Vector2.ZERO
 var rod_length := 200.0
 var width := 140.0
 var max_angle := 0.6
+var beats_per_side := 1.0
 
 var _box := StyleBoxFlat.new()
 
 
-func setup(m, p: Vector2, length: float, w: float, angle := 0.6) -> void:
+func setup(m, p: Vector2, length: float, w: float, angle := 0.6, beats := 1.0) -> void:
 	main = m
+	beats_per_side = beats
 	pivot = p
 	rod_length = length
 	width = w
@@ -38,7 +40,7 @@ func _ready() -> void:
 
 
 func _target() -> Vector2:
-	var s: float = main.swing()
+	var s: float = main.swing(0.0, beats_per_side)
 	var a := s * max_angle
 	return pivot + Vector2(sin(a), cos(a)) * rod_length
 
