@@ -4,6 +4,8 @@ A 2D platformer made in Godot 4 for the OctAIJam (theme: *surreal* — and you c
 
 You are an ice cube at a very strange concert. Hop across giant piano keys while a metronome ticks; every jump plays a note in the song. Stop pressing for 2 seconds and you melt. Note-blocks switch on and off with the beat, red notes are hot, and each level ends in a glass of lemonade.
 
+Design doc: [docs/GDD.md](docs/GDD.md)
+
 ## Run it
 
 Install [Godot 4](https://godotengine.org/download) (the standard build, not .NET) on Windows, macOS or Linux, then either:
