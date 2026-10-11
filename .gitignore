@@ -4,3 +4,4 @@
 
 # Claude Code personal settings
 .claude/settings.local.json
+.claude/worktrees/

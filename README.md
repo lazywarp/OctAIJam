@@ -21,10 +21,11 @@ All art and audio are generated in code, so there are no asset files.
 |---|---|---|
 | Move | Arrows / A D | D-pad / left stick |
 | Jump | Space / W / Up / Z | A |
+| Mute | M | Back |
 | Fullscreen | F11 | |
 | Quit | Esc | |
 
-Holding any key counts as input — letting go of everything starts the 2-second melt.
+Holding any key counts as input — letting go of everything starts the 2-second melt. Drips warn you after 1 second. After a melt, press jump to restart right away.
 
 ## Layout
 
