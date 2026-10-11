@@ -3,6 +3,9 @@ extends RefCounted
 ## Jump reach: ~120 px up, ~250 px across. Keep gaps <= 120 and rises <= 90.
 ##   solid: piano-key ground   a / b: note blocks that alternate every 2 beats
 ##   hot: hazards              signs: [position, text]
+##   pend: pendulum platforms, [pivot: Vector2, rod_length, width, max_angle (radians, ~0.6)].
+##         The slab hangs rod_length below the pivot and swings with the metronome, at an
+##         extreme on every beat; it travels sin(max_angle) * rod_length each side.
 
 
 static func all() -> Array:
