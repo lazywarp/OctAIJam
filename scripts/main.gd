@@ -21,6 +21,7 @@ const RESTART_FAST := 0.5 # auto-restart delay after a sizzle or a fall
 const SKIP_LOCKOUT := 0.2 # a fresh press after this long into dying restarts immediately
 const ROOT_HZ := 523.25 # C5
 const BASS_HZ := 130.81 # C3
+const BEST_PATH := "user://best_times.cfg" # section "best", key = level index
 # I - vi - IV - V, as semitones above the root.
 const CHORDS := [[0, 4, 7], [9, 12, 16], [5, 9, 12], [7, 11, 14]]
 
@@ -35,6 +36,10 @@ var level: Dictionary = {}
 var state := "title" # title, play, dying, win, end
 var message := ""
 var message_t := 0.0
+var level_time := 0.0 # current attempt at this level; resets on death
+var run_times: Array[float] = [] # this run's clear time per level, -1 if not cleared
+var run_new_best: Array[bool] = [] # whether that clear set a new best
+var best_times: Dictionary = {} # level index -> best clear time, persisted
 
 var camera: Camera2D
 var world: Node2D
@@ -53,6 +58,7 @@ var _goal: GoalScript
 func _ready() -> void:
 	randomize()
 	_setup_input()
+	_load_bests()
 	RenderingServer.set_default_clear_color(Color("17122b"))
 
 	synth = SynthScript.new()
@@ -133,6 +139,7 @@ func _process(delta: float) -> void:
 			if Input.is_action_just_pressed("jump"):
 				_start_game()
 		"play":
+			level_time += delta
 			if _input_active():
 				idle = 0.0
 			else:
@@ -253,6 +260,11 @@ func _on_land() -> void:
 
 func _start_game() -> void:
 	deaths = 0
+	run_times.clear()
+	run_new_best.clear()
+	for i in level_count():
+		run_times.append(-1.0)
+		run_new_best.append(false)
 	_load_level(0, true)
 
 
@@ -293,6 +305,7 @@ func _load_level(i: int, announce: bool) -> void:
 	player.landed.connect(_on_land)
 
 	idle = 0.0
+	level_time = 0.0
 	state = "play"
 	camera.limit_bottom = int(level.get("cam_bottom", 800))
 	camera.position = player.position + Vector2(0, -40)
@@ -330,7 +343,66 @@ func reach_goal() -> void:
 	_goal.celebrate()
 	for k in 6:
 		get_tree().create_timer(k * 0.09).timeout.connect(synth.play.bind("note", _chord_hz(k), -5.0))
-	_show("Bravo!", 1.8)
+	_show("Bravo! New best %s" % format_time(level_time) if _record_clear() else "Bravo!", 1.8)
+
+
+# Stores this run's clear time and updates the saved best. Returns true on a new best.
+func _record_clear() -> bool:
+	var i := level_index
+	if i < run_times.size():
+		run_times[i] = level_time
+	var old: float = best_times.get(i, -1.0)
+	if old >= 0.0 and level_time >= old:
+		return false
+	best_times[i] = level_time
+	if i < run_new_best.size():
+		run_new_best[i] = true
+	_save_bests()
+	return true
+
+
+func _load_bests() -> void:
+	best_times.clear()
+	var cfg := ConfigFile.new()
+	if cfg.load(BEST_PATH) != OK or not cfg.has_section("best"):
+		return # missing or unreadable: start with no bests
+	for key: String in cfg.get_section_keys("best"):
+		var t: Variant = cfg.get_value("best", key, -1.0)
+		if key.is_valid_int() and (t is float or t is int) and float(t) > 0.0:
+			best_times[key.to_int()] = float(t)
+
+
+func _save_bests() -> void:
+	var cfg := ConfigFile.new()
+	for i: int in best_times:
+		cfg.set_value("best", str(i), best_times[i])
+	var err := cfg.save(BEST_PATH)
+	if err != OK:
+		push_warning("Could not save best times: %s" % error_string(err))
+
+
+func level_name(i: int) -> String:
+	return str(Levels.all()[i].get("name", ""))
+
+
+func best_time(i: int) -> float:
+	return best_times.get(i, -1.0)
+
+
+## Sum of this run's clear times (levels not cleared count as zero).
+func run_total() -> float:
+	var total := 0.0
+	for t in run_times:
+		total += maxf(t, 0.0)
+	return total
+
+
+## m:ss.t, e.g. 0:23.4. Negative means no time.
+static func format_time(t: float) -> String:
+	if t < 0.0:
+		return "--"
+	var tenths := floori(t * 10.0)
+	return "%d:%02d.%d" % [floori(tenths / 600.0), floori(tenths / 10.0) % 60, tenths % 10]
 
 
 func _show(text: String, duration: float) -> void:
