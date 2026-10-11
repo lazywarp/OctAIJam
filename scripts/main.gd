@@ -13,7 +13,8 @@ const Levels := preload("res://scripts/levels.gd")
 
 const BPM := 100.0
 const IDLE_LIMIT := 2.0
-const BEATS_PER_SWITCH := 2
+const DEFAULT_SWITCH_BEATS := 2
+const SWITCH_GRACE := 0.7 # from this switch_phase on, the incoming beat group is already solid
 const ROOT_HZ := 523.25 # C5
 const BASS_HZ := 130.81 # C3
 # I - vi - IV - V, as semitones above the root.
@@ -22,6 +23,7 @@ const CHORDS := [[0, 4, 7], [9, 12, 16], [5, 9, 12], [7, 11, 14]]
 var beat := 0
 var beat_phase := 0.0 # 0..1 progress through the current beat
 var switch_phase := 0.0 # 0..1 progress until beat platforms flip
+var switch_beats := DEFAULT_SWITCH_BEATS
 var idle := 0.0
 var deaths := 0
 var level_index := 0
@@ -159,8 +161,14 @@ func melt_ratio() -> float:
 	return clampf(idle / IDLE_LIMIT, 0.0, 1.0)
 
 
+## True while this group's bar is playing (ignores the grace overlap).
+func beat_group_on(group: int) -> bool:
+	return floori(float(beat) / switch_beats) % 2 == group
+
+
+## True while the group is solid: its own bar, plus the incoming grace window.
 func beat_group_active(group: int) -> bool:
-	return floori(float(beat) / BEATS_PER_SWITCH) % 2 == group
+	return beat_group_on(group) or switch_phase >= SWITCH_GRACE
 
 
 # --- Beat & music -----------------------------------------------------------
@@ -173,7 +181,7 @@ func _update_beat(delta: float) -> void:
 		beat += 1
 		_on_beat()
 	beat_phase = _beat_clock / spb
-	switch_phase = (float(beat % BEATS_PER_SWITCH) + beat_phase) / BEATS_PER_SWITCH
+	switch_phase = (float(beat % switch_beats) + beat_phase) / switch_beats
 
 
 func _on_beat() -> void:
@@ -213,6 +221,7 @@ func _start_game() -> void:
 func _load_level(i: int, announce: bool) -> void:
 	level_index = i
 	level = Levels.all()[i]
+	switch_beats = int(level.get("switch_beats", DEFAULT_SWITCH_BEATS))
 	if world:
 		world.queue_free()
 	world = Node2D.new()
