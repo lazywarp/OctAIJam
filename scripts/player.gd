@@ -20,7 +20,7 @@ var melt := 0.0 # 0..1, how close to melting from standing still
 var dead := false
 
 var _shown_melt := 0.0
-var _melt_speed := 1.6
+var _melt_speed := 2.4
 var _coyote := 0.0
 var _buffer := 0.0
 var _was_on_floor := true
@@ -43,7 +43,7 @@ func _ready() -> void:
 func die(hot: bool) -> void:
 	dead = true
 	velocity = Vector2.ZERO
-	_melt_speed = 4.0 if hot else 1.6
+	_melt_speed = 4.0 if hot else 2.4 # fully melted well before main.gd restarts
 
 
 func win() -> void:
