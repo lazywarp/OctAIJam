@@ -33,6 +33,8 @@ func _draw() -> void:
 			_text(vp.y * 0.72, "Press SPACE to begin", 34, Color(1, 1, 1, blink))
 			_text(vp.y * 0.72 + 44, "Move: Arrows / A D    Jump: Space / W    Mute: M    Fullscreen: F11    Quit: Esc", 18, Color(1, 1, 1, 0.6))
 		"end":
+			# Dim the last level so the results table stays readable.
+			draw_rect(Rect2(Vector2.ZERO, vp), Color(0.05, 0.03, 0.1, 0.8))
 			_text(vp.y * 0.24, "FINE", 110, Color("ffe27a"))
 			_text(vp.y * 0.24 + 56, "The concert is over. You stayed frozen.", 28, Color.WHITE)
 			_text(vp.y * 0.24 + 94, "Melts: %d" % main.deaths, 28, Color("bff3ff"))

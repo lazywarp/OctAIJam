@@ -86,9 +86,9 @@ A global beat clock at 100 BPM (0.6 s per beat) drives the music and the world; 
 | Fall-out | Built | Dropping below the level resets it | Gaps matter |
 | Lemonade glass | Built | Goal; diving in ends the level with a splash and an arpeggio | Clear destination |
 | Hint signs | Built | Text placed in the world | Rules without a tutorial screen |
-| Pendulum platform | Proposed | Rides the metronome's swing left and right on the beat | Reading the background as a rule |
+| Pendulum platform | Built | Rides the metronome's swing left and right on the beat | Reading the background as a rule |
 | Heat lamp | Proposed | Melt fills faster while you stand under it | Pressure even while inputting |
-| Tempo change | Proposed | Later levels raise the BPM (100 → 120 → 140) | Difficulty curve without new rules |
+| Tempo change | Built | Later levels raise the BPM (100 → 120 → 140) | Difficulty curve without new rules |
 | Refreezer (snowflake) | Proposed | Pickup that buys extra stillness time once | A rare chance to pause and plan |
 
 Beat-block timing at 100 BPM: a 2-beat turn lasts 1.2 s with a 0.36 s overlap; a 4-beat turn lasts 2.4 s with a 0.72 s overlap. A full jump takes about 0.75 s, so a jump started in the overlap always lands on solid ground.
@@ -154,7 +154,7 @@ The look is flat, code-drawn shapes on a dark purple concert hall, and colour al
 - A red screen tint builds past 40% stillness.
 - Centre messages for level names, death reasons and "Bravo!".
 
-**Screens:** a title screen (name, premise, controls) and an end screen ("FINE", total melts, press Space to replay). Proposed: best time per level on the end screen.
+**Screens:** a title screen (name, premise, controls) and an end screen ("FINE", total melts, press Space to replay). The end screen dims the level and lists this run's time and the best time per level, plus a total; bests are saved to `user://best_times.cfg`. The play HUD shows the BPM under the level name and the attempt timer at top right.
 
 ## Technical design
 
@@ -222,10 +222,10 @@ The remaining work splits into 14 blocks of 10–40 minutes, each small enough t
 | A2 | Stillness warning drips | Must | 15 | — | Drip sound starts at 1 s of stillness and speeds up | Done |
 | A3 | Mute toggle | Must | 10 | — | M toggles all audio | Done |
 | A4 | Death and restart feel | Must | 15 | A1 | Restart delay tuned; retrying feels instant | Done |
-| B1 | Pendulum platform | Should | 30 | — | Platform follows the metronome swing and carries the player | Not started |
-| B2 | Per-level tempo | Should | 20 | — | BPM set per level; beat blocks and music follow it | Not started |
+| B1 | Pendulum platform | Should | 30 | — | Platform follows the metronome swing and carries the player | Done |
+| B2 | Per-level tempo | Should | 20 | — | BPM set per level; beat blocks and music follow it | Done |
 | B3 | Level V: Accelerando | Should | 30 | B1, B2 | Beatable in under 60 s, uses pendulums and a tempo rise | Not started |
-| B4 | Best time per level | Should | 20 | — | Timer per level; bests shown on the end screen | Not started |
+| B4 | Best time per level | Should | 20 | — | Timer per level; bests shown on the end screen | Done |
 | C1 | Heat lamps | Could | 20 | — | Stillness fills twice as fast under a lamp | Not started |
 | C2 | Refreezer pickup | Could | 15 | — | Pickup adds 2 s of stillness allowance once | Not started |
 | C3 | Level VI: Finale | Could | 40 | B1, B2, C1 | All elements at 140 BPM, beatable in under 90 s | Not started |
