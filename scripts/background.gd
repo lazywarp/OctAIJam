@@ -17,17 +17,19 @@ func _draw() -> void:
 
 	draw_circle(Vector2(vp.x * 0.5, vp.y * 0.6), vp.y * 0.7, Color(0.35, 0.15, 0.55, 0.16 + 0.05 * pulse))
 
-	# The metronome swings to an extreme on every tick.
-	var base := Vector2(vp.x * 0.5, vp.y + 40.0)
+	# A small metronome in the top-right corner, clear of the play area. It swings to an
+	# extreme on every tick.
+	var k := 0.32
+	var base := Vector2(vp.x - 96.0, 300.0)
 	draw_colored_polygon(PackedVector2Array([
-		base + Vector2(-170, 0), base + Vector2(170, 0), base + Vector2(60, -560), base + Vector2(-60, -560)
-	]), Color(1, 1, 1, 0.035))
+		base + Vector2(-170, 0) * k, base + Vector2(170, 0) * k, base + Vector2(60, -560) * k, base + Vector2(-60, -560) * k
+	]), Color(1, 1, 1, 0.07))
 	var swing: float = main.swing()
 	var angle := swing * 0.5
-	var pivot := base + Vector2(0, -70)
+	var pivot := base + Vector2(0, -70) * k
 	var dir := Vector2(sin(angle), -cos(angle))
-	draw_line(pivot, pivot + dir * 520.0, Color(1, 1, 1, 0.13), 6.0)
-	draw_circle(pivot + dir * 330.0, 26.0, Color(1, 1, 1, 0.12 + 0.08 * pulse))
+	draw_line(pivot, pivot + dir * 520.0 * k, Color(1, 1, 1, 0.22), 3.0)
+	draw_circle(pivot + dir * 330.0 * k, 9.0, Color(1, 1, 1, 0.2 + 0.15 * pulse))
 
 	# Staves drift with a little parallax.
 	for st in 3:

@@ -3,7 +3,8 @@ extends RefCounted
 ## Jump reach: ~120 px up, ~250 px across. Keep gaps <= 120 and rises <= 90.
 ##   solid: piano-key ground   a / b: note blocks that alternate every 2 beats
 ##   hot: hazards              signs: [position, text]
-##   pend: pendulum platforms, [pivot: Vector2, rod_length, width, max_angle (radians, ~0.6)].
+##   pend: pendulum platforms, [pivot: Vector2, rod_length, width, max_angle (radians, ~0.6),
+##         beats_per_side (optional, default 1; 2 = half speed)].
 ##         The slab hangs rod_length below the pivot and swings with the metronome, at an
 ##         extreme on every beat; it travels sin(max_angle) * rod_length each side.
 ## Optional:
@@ -109,6 +110,38 @@ static func all() -> Array:
 			],
 			"signs": [
 				[Vector2(150, 545), "Da capo: from the top. Climb!"],
+			],
+		},
+		{
+			"name": "V. Accelerando",
+			"spawn": Vector2(0, 570),
+			"goal": Vector2(3080, -100),
+			"tempo": [[1100.0, 120.0], [2100.0, 140.0]],
+			"solid": [
+				Rect2(-340, 200, 40, 600),
+				Rect2(-300, 600, 700, 200),
+				Rect2(1000, 520, 240, 280),
+				Rect2(2060, 300, 200, 30),
+				Rect2(2120, 140, 140, 24),
+				Rect2(2820, -100, 400, 24),
+			],
+			"pend": [
+				[Vector2(560, 340), 200.0, 140.0, 0.45, 2.0],
+				[Vector2(820, 300), 200.0, 140.0, 0.45, 2.0],
+				[Vector2(1380, 260), 200.0, 140.0, 0.45, 2.0],
+				[Vector2(1640, 200), 200.0, 140.0, 0.45, 2.0],
+				[Vector2(1900, 140), 200.0, 140.0, 0.45, 2.0],
+				[Vector2(2420, -130), 200.0, 140.0, 0.45, 2.0],
+			],
+			"a": [
+				Rect2(2300, 220, 140, 24),
+			],
+			"b": [
+				Rect2(2600, -20, 140, 24),
+			],
+			"signs": [
+				[Vector2(150, 470), "The metronome came loose. Ride it."],
+				[Vector2(1120, 440), "Accelerando: the tempo is rising."],
 			],
 		},
 	]

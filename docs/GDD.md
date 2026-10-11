@@ -86,7 +86,7 @@ A global beat clock at 100 BPM (0.6 s per beat) drives the music and the world; 
 | Fall-out | Built | Dropping below the level resets it | Gaps matter |
 | Lemonade glass | Built | Goal; diving in ends the level with a splash and an arpeggio | Clear destination |
 | Hint signs | Built | Text placed in the world | Rules without a tutorial screen |
-| Pendulum platform | Built | Rides the metronome's swing left and right on the beat | Reading the background as a rule |
+| Pendulum platform | Built | Brass slab on a rod from a bolted ceiling beam, swinging with the metronome (optionally at half speed); a dotted arc shows its path | Riding the beat |
 | Heat lamp | Proposed | Melt fills faster while you stand under it | Pressure even while inputting |
 | Tempo change | Built | Later levels raise the BPM (100 → 120 → 140) | Difficulty curve without new rules |
 | Refreezer (snowflake) | Proposed | Pickup that buys extra stillness time once | A rare chance to pause and plan |
@@ -103,7 +103,7 @@ Each level introduces one idea, then tests it once in combination. Levels are na
 | II | Syncopation | Beat blocks: same-colour pairs first, alternating only at the end | Yes | 45 s |
 | III | Fortissimo | Hot notes plus beat blocks over a fire pit | Yes | 60 s |
 | IV | Da Capo | Vertical climb on mixed blocks | Yes | 45 s |
-| V | Accelerando | Tempo rises mid-level; pendulum platforms | Proposed | 60 s |
+| V | Accelerando | Six half-speed pendulums, tempo 100 → 120 → 140, then a vertical climb over beat blocks | Yes | 60 s |
 | VI | Finale | Everything at 140 BPM, heat lamps | Proposed | 90 s |
 
 **Design rules**
@@ -145,7 +145,7 @@ The look is flat, code-drawn shapes on a dark purple concert hall, and colour al
 | Red-orange | #ff5a3c | Hazards, the stillness warning |
 | Lemon | #ffe27a | The goal and wins |
 
-**Background:** a giant metronome swings to an extreme on every tick, behind music staves and floating notes that pulse on the beat, with slight parallax.
+**Background:** a small metronome in the top-right corner swings to an extreme on every tick, behind music staves and floating notes that pulse on the beat, with slight parallax. It used to be large and centred, but in playtesting its arm was confused with the pendulum platforms, so it moved out of the play area.
 
 **HUD**
 
@@ -208,6 +208,7 @@ The core game is done; the remaining time goes first to making the four existing
 
 - Heat lamps, the refreezer pickup and level VI, Finale.
 - Pad / chord layer in the music.
+- Per-level backgrounds.
 - Exported builds for Windows, macOS and Linux.
 
 Reserve the last 20 minutes for a full playthrough and a final commit; nothing new starts after that point.
@@ -224,12 +225,13 @@ The remaining work splits into 14 blocks of 10–40 minutes, each small enough t
 | A4 | Death and restart feel | Must | 15 | A1 | Restart delay tuned; retrying feels instant | Done |
 | B1 | Pendulum platform | Should | 30 | — | Platform follows the metronome swing and carries the player | Done |
 | B2 | Per-level tempo | Should | 20 | — | BPM set per level; beat blocks and music follow it | Done |
-| B3 | Level V: Accelerando | Should | 30 | B1, B2 | Beatable in under 60 s, uses pendulums and a tempo rise | Not started |
+| B3 | Level V: Accelerando | Should | 30 | B1, B2 | Beatable in under 60 s, uses pendulums and a tempo rise | Done |
 | B4 | Best time per level | Should | 20 | — | Timer per level; bests shown on the end screen | Done |
 | C1 | Heat lamps | Could | 20 | — | Stillness fills twice as fast under a lamp | Not started |
 | C2 | Refreezer pickup | Could | 15 | — | Pickup adds 2 s of stillness allowance once | Not started |
 | C3 | Level VI: Finale | Could | 40 | B1, B2, C1 | All elements at 140 BPM, beatable in under 90 s | Not started |
 | C4 | Music pad layer | Could | 15 | — | Soft chord pad under the bass | Not started |
+| C6 | Per-level backgrounds | Could | 30 | — | Each level sets its own backdrop (e.g. a red stage glow for III, no metronome in V) | Not started |
 | C5 | Exported builds | Could | 20 | — | Windows, macOS and Linux exports launch | Not started |
 | Z1 | Final playthrough and commit | Must | 20 | All started blocks | Full run start to end; committed and pushed | Not started |
 

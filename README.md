@@ -11,7 +11,7 @@ Design doc: [docs/GDD.md](docs/GDD.md)
 Install [Godot 4](https://godotengine.org/download) (the standard build, not .NET) on Windows, macOS or Linux, then either:
 
 - open the Godot editor, **Import** this folder's `project.godot`, and press **F5**; or
-- from this folder run `godot --path .`
+- from this folder run `godot --path .` (add `-- --level 5` to jump straight to a level)
 
 All art and audio are generated in code, so there are no asset files.
 
