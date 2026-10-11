@@ -105,10 +105,19 @@ func _input(event: InputEvent) -> void:
 		elif event.keycode == KEY_F11:
 			var full := DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
 			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED if full else DisplayServer.WINDOW_MODE_FULLSCREEN)
+		elif event.keycode == KEY_M:
+			_toggle_mute()
+	elif event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_BACK:
+		_toggle_mute()
 	if (event is InputEventKey or event is InputEventJoypadButton or event is InputEventMouseButton) and event.is_pressed():
 		_pressed_this_frame = true
 	elif event is InputEventJoypadMotion and absf(event.axis_value) > 0.5:
 		_pressed_this_frame = true
+
+
+func _toggle_mute() -> void:
+	var bus := AudioServer.get_bus_index("Master")
+	AudioServer.set_bus_mute(bus, not AudioServer.is_bus_mute(bus))
 
 
 func _process(delta: float) -> void:

@@ -31,7 +31,7 @@ func _draw() -> void:
 			_text(vp.y * 0.32 + 60, "You are an ice cube at a very strange concert.", 26, Color.WHITE)
 			_text(vp.y * 0.32 + 96, "Stop pressing for 2 seconds and you melt.", 26, Color("ffb3a0"))
 			_text(vp.y * 0.72, "Press SPACE to begin", 34, Color(1, 1, 1, blink))
-			_text(vp.y * 0.72 + 44, "Move: Arrows / A D     Jump: Space / W     Fullscreen: F11     Quit: Esc", 18, Color(1, 1, 1, 0.6))
+			_text(vp.y * 0.72 + 44, "Move: Arrows / A D    Jump: Space / W    Mute: M    Fullscreen: F11    Quit: Esc", 18, Color(1, 1, 1, 0.6))
 		"end":
 			_text(vp.y * 0.34, "FINE", 110, Color("ffe27a"))
 			_text(vp.y * 0.34 + 60, "The concert is over. You stayed frozen.", 28, Color.WHITE)
@@ -43,6 +43,11 @@ func _draw() -> void:
 	if main.message_t > 0.0:
 		var a := clampf(main.message_t * 2.0, 0.0, 1.0)
 		_text(vp.y * 0.28, main.message, 46, Color(1, 1, 1, a))
+
+	if AudioServer.is_bus_mute(AudioServer.get_bus_index("Master")):
+		var pos := Vector2(vp.x - 224, vp.y - 20)
+		draw_string_outline(font, pos, "Muted (M)", HORIZONTAL_ALIGNMENT_RIGHT, 200, 18, 6, Color(0.05, 0.03, 0.1, 0.6))
+		draw_string(font, pos, "Muted (M)", HORIZONTAL_ALIGNMENT_RIGHT, 200, 18, Color(1, 1, 1, 0.5))
 
 
 func _draw_play_hud(vp: Vector2) -> void:
