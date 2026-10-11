@@ -22,7 +22,8 @@ func _draw() -> void:
 	draw_colored_polygon(PackedVector2Array([
 		base + Vector2(-170, 0), base + Vector2(170, 0), base + Vector2(60, -560), base + Vector2(-60, -560)
 	]), Color(1, 1, 1, 0.035))
-	var angle := cos(PI * (beat + phase)) * 0.5
+	var swing: float = main.swing()
+	var angle := swing * 0.5
 	var pivot := base + Vector2(0, -70)
 	var dir := Vector2(sin(angle), -cos(angle))
 	draw_line(pivot, pivot + dir * 520.0, Color(1, 1, 1, 0.13), 6.0)

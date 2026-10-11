@@ -4,6 +4,7 @@ extends Node2D
 const PlayerScript := preload("res://scripts/player.gd")
 const PlatformScript := preload("res://scripts/platform.gd")
 const HazardScript := preload("res://scripts/hazard.gd")
+const PendulumScript := preload("res://scripts/pendulum.gd")
 const GoalScript := preload("res://scripts/goal.gd")
 const SignScript := preload("res://scripts/sign.gd")
 const SynthScript := preload("res://scripts/synth.gd")
@@ -219,6 +220,12 @@ func beat_group_active(group: int) -> bool:
 	return beat_group_on(group) or switch_phase >= SWITCH_GRACE
 
 
+## The metronome swing, -1..1, at an extreme on every tick. The background arm and
+## pendulum platforms both read it, so they can never drift apart.
+func swing(offset := 0.0) -> float:
+	return cos(PI * (beat + beat_phase + offset))
+
+
 # --- Beat & music -----------------------------------------------------------
 
 # The clock counts in beats, so changing bpm only changes its speed: beat and
@@ -317,6 +324,10 @@ func _load_level(i: int, announce: bool) -> void:
 		_add_platform(PlatformScript.Kind.BEAT_A, r)
 	for r in level.get("b", []):
 		_add_platform(PlatformScript.Kind.BEAT_B, r)
+	for pd in level.get("pend", []):
+		var pn := PendulumScript.new()
+		pn.setup(self, pd[0], pd[1], pd[2], pd[3])
+		world.add_child(pn)
 	for r in level.get("hot", []):
 		var hz := HazardScript.new()
 		hz.setup(self, r)
