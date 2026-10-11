@@ -26,7 +26,7 @@ Every feature must serve at least one of these four pillars; anything that serve
 1. **Never stop.** Stillness is the only enemy. Every mechanic should push the player to keep inputting, and should never trap them with nothing to do.
 2. **Play the music.** Movement is performance: jumps make notes, the world moves on the beat, and a good run sounds good.
 3. **Readable surrealism.** The world is strange (piano keys, a giant metronome, a lemonade finish line) but every rule is shown on screen, never hidden.
-4. **Fail fast, retry instantly.** A death costs about 1 second and restarts the current level, so experimenting is cheap.
+4. **Fail fast, retry instantly.** A death costs 0.5–0.7 seconds (or less: press jump to skip) and restarts the current level, so experimenting is cheap.
 
 ## Core loop and the stillness rule
 
@@ -40,7 +40,7 @@ flowchart LR
     Input -- no --> Builds[Stillness builds, cube sags]
     Builds -- at 2 s --> Melt[Melt: level restarts]
     Hazard[Hot note or fall] --> Melt
-    Melt -- restart the same level after about 1 s --> Play
+    Melt -- "restart after 0.5–0.7 s, or press jump" --> Play
 ```
 
 Input means any key, mouse button or gamepad button held or pressed, or a stick pushed past halfway. The stillness clock pauses during death, win and menu screens. Reaching the lemonade moves you to the next level; after level IV comes the end screen.
@@ -68,6 +68,7 @@ The player is a 36 px ice cube that slides and jumps; its only ability is a vari
 | --- | --- | --- |
 | Move | Arrows, A / D | D-pad, left stick |
 | Jump | Space, W, Up, Z | A |
+| Mute | M | Back |
 | Fullscreen | F11 | — |
 | Quit | Esc | — |
 
@@ -126,9 +127,9 @@ All sound is synthesized at startup by `scripts/synth.gd` (22 kHz, 16-voice pool
 | Melt | Death by stillness | Yes | Descending wobble |
 | Sizzle | Death by hot note | Yes | Noise burst |
 | Win arpeggio | Reaching the goal | Yes | Six chord tones, 90 ms apart |
-| Stillness warning | Stillness past 1 s | Proposed | Drip sounds that speed up toward the reset |
+| Stillness warning | Stillness past 1 s | Yes | Drips every 0.35 s at 1 s, down to 0.08 s, pitch 900 to 1300 Hz |
 | Pad / chords layer | Always | Proposed | Soft sustained chord to fill the mix |
-| Mute / volume | M key | Proposed | Needed for a public showing |
+| Mute | M key, gamepad Back | Yes | Mutes the Master bus; "Muted (M)" shown bottom right |
 
 ## Art direction and UI
 
@@ -217,10 +218,10 @@ The remaining work splits into 14 blocks of 10–40 minutes, each small enough t
 
 | ID | Block | Tier | Est. (min) | Depends on | Done when | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| A1 | Playtest and retune levels I–IV | Must | 30 | — | You clear every level without a death that feels unfair | Not started |
-| A2 | Stillness warning drips | Must | 15 | — | Drip sound starts at 1 s of stillness and speeds up | Not started |
-| A3 | Mute toggle | Must | 10 | — | M toggles all audio | Not started |
-| A4 | Death and restart feel | Must | 15 | A1 | Restart delay tuned; retrying feels instant | Not started |
+| A1 | Playtest and retune levels I–IV | Must | 30 | — | You clear every level without a death that feels unfair | Done |
+| A2 | Stillness warning drips | Must | 15 | — | Drip sound starts at 1 s of stillness and speeds up | Done |
+| A3 | Mute toggle | Must | 10 | — | M toggles all audio | Done |
+| A4 | Death and restart feel | Must | 15 | A1 | Restart delay tuned; retrying feels instant | Done |
 | B1 | Pendulum platform | Should | 30 | — | Platform follows the metronome swing and carries the player | Not started |
 | B2 | Per-level tempo | Should | 20 | — | BPM set per level; beat blocks and music follow it | Not started |
 | B3 | Level V: Accelerando | Should | 30 | B1, B2 | Beatable in under 60 s, uses pendulums and a tempo rise | Not started |
