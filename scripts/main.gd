@@ -13,6 +13,7 @@ const Levels := preload("res://scripts/levels.gd")
 
 const BPM := 100.0
 const IDLE_LIMIT := 2.0
+const DRIP_START := 1.0 # stillness (s) before warning drips begin
 const DEFAULT_SWITCH_BEATS := 2
 const SWITCH_GRACE := 0.7 # from this switch_phase on, the incoming beat group is already solid
 const ROOT_HZ := 523.25 # C5
@@ -41,6 +42,7 @@ var _beat_clock := 0.0
 var _state_t := 0.0
 var _melody_i := 0
 var _pressed_this_frame := false
+var _drip_t := 0.0 # countdown to the next stillness warning drip
 var _goal: GoalScript
 
 
@@ -123,6 +125,7 @@ func _process(delta: float) -> void:
 			else:
 				idle += delta
 			player.melt = melt_ratio()
+			_update_drips(delta)
 			if idle >= IDLE_LIMIT:
 				die("You stood still. You melted.")
 			elif player.position.y > float(level.get("kill_y", 900.0)):
@@ -144,6 +147,18 @@ func _process(delta: float) -> void:
 
 	_update_camera(delta)
 	_pressed_this_frame = false
+
+
+# Warning drips while standing still: faster and slightly higher as the melt nears.
+func _update_drips(delta: float) -> void:
+	if idle < DRIP_START or idle >= IDLE_LIMIT:
+		_drip_t = 0.0
+		return
+	_drip_t -= delta
+	if _drip_t <= 0.0:
+		var u := clampf((idle - DRIP_START) / (IDLE_LIMIT - DRIP_START), 0.0, 1.0)
+		_drip_t = lerpf(0.35, 0.08, u)
+		synth.play("drip", lerpf(900.0, 1300.0, u), -10.0)
 
 
 func _input_active() -> bool:

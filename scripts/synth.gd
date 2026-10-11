@@ -3,7 +3,7 @@ extends Node
 
 const MIX_RATE := 22050
 const VOICES := 16
-const LENGTHS := {"tick": 0.05, "thud": 0.15, "note": 0.6, "bass": 1.0, "melt": 0.9, "sizzle": 0.5}
+const LENGTHS := {"tick": 0.05, "thud": 0.15, "note": 0.6, "bass": 1.0, "melt": 0.9, "sizzle": 0.5, "drip": 0.08}
 
 var _players: Array[AudioStreamPlayer] = []
 var _next := 0
@@ -54,6 +54,10 @@ func _sample(kind: String, freq: float) -> AudioStreamWAV:
 				s = sin(phase + 2.0 * sin(phase * 0.5)) * (1.0 - t / length) * 0.5
 			"sizzle":
 				s = randf_range(-1.0, 1.0) * exp(-t * 5.0) * 0.4
+			"drip":
+				# Water drop: sine whose pitch sweeps up fast, with a quick decay.
+				phase += TAU * freq * (1.0 + 1.5 * minf(1.0, t / 0.03)) / MIX_RATE
+				s = sin(phase) * exp(-t * 55.0) * 0.5 * minf(1.0, t * 1000.0)
 		data.encode_s16(i * 2, int(clampf(s, -1.0, 1.0) * 32000.0))
 
 	var wav := AudioStreamWAV.new()
