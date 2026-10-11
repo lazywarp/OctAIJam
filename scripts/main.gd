@@ -11,7 +11,8 @@ const BackgroundScript := preload("res://scripts/background.gd")
 const HudScript := preload("res://scripts/hud.gd")
 const Levels := preload("res://scripts/levels.gd")
 
-const BPM := 100.0
+const DEFAULT_BPM := 100.0
+const TEMPO_RAMP_BEATS := 4.0 # a tempo zone eases to its new bpm over one bar
 const IDLE_LIMIT := 2.0
 const DRIP_START := 1.0 # stillness (s) before warning drips begin
 const DEFAULT_SWITCH_BEATS := 2
@@ -28,6 +29,8 @@ var beat := 0
 var beat_phase := 0.0 # 0..1 progress through the current beat
 var switch_phase := 0.0 # 0..1 progress until beat platforms flip
 var switch_beats := DEFAULT_SWITCH_BEATS
+var bpm := DEFAULT_BPM
+var tempo_flash := 0.0 # 1 -> 0, HUD highlight after a tempo change
 var idle := 0.0
 var deaths := 0
 var level_index := 0
@@ -41,7 +44,12 @@ var world: Node2D
 var player: PlayerScript
 var synth: SynthScript
 
-var _beat_clock := 0.0
+var _beat_clock := 0.0 # progress through the current beat, in beats (0..1)
+var _bpm_from := DEFAULT_BPM
+var _bpm_to := DEFAULT_BPM
+var _ramp := 1.0 # 0..1 progress of the current tempo ramp
+var _tempo_i := 0 # next untriggered tempo zone (zones are sorted by x)
+var _tempo_zones: Array = []
 var _state_t := 0.0
 var _dying_t := 0.0 # time since death, for the skip lockout
 var _melody_i := 0
@@ -127,6 +135,7 @@ func _toggle_mute() -> void:
 func _process(delta: float) -> void:
 	_update_beat(delta)
 	message_t = maxf(message_t - delta, 0.0)
+	tempo_flash = maxf(tempo_flash - delta, 0.0)
 
 	match state:
 		"title":
@@ -138,6 +147,7 @@ func _process(delta: float) -> void:
 			else:
 				idle += delta
 			player.melt = melt_ratio()
+			_update_tempo_zones()
 			_update_drips(delta)
 			if idle >= IDLE_LIMIT:
 				die("You stood still. You melted.")
@@ -211,15 +221,50 @@ func beat_group_active(group: int) -> bool:
 
 # --- Beat & music -----------------------------------------------------------
 
+# The clock counts in beats, so changing bpm only changes its speed: beat and
+# beat_phase stay continuous.
 func _update_beat(delta: float) -> void:
-	var spb := 60.0 / BPM
-	_beat_clock += delta
-	while _beat_clock >= spb:
-		_beat_clock -= spb
+	if _ramp < 1.0:
+		_ramp = minf(_ramp + delta * bpm / 60.0 / TEMPO_RAMP_BEATS, 1.0)
+		bpm = lerpf(_bpm_from, _bpm_to, smoothstep(0.0, 1.0, _ramp))
+		tempo_flash = 1.0
+	_beat_clock += delta * bpm / 60.0
+	while _beat_clock >= 1.0:
+		_beat_clock -= 1.0
 		beat += 1
 		_on_beat()
-	beat_phase = _beat_clock / spb
+	beat_phase = _beat_clock
 	switch_phase = (float(beat % switch_beats) + beat_phase) / switch_beats
+
+
+## Jump straight to a tempo (level start); no ramp.
+func set_bpm(value: float) -> void:
+	if not is_equal_approx(value, bpm):
+		tempo_flash = 1.0
+	bpm = value
+	_bpm_from = value
+	_bpm_to = value
+	_ramp = 1.0
+
+
+## Ease from the current tempo to `value` over one bar.
+func ramp_bpm(value: float) -> void:
+	_bpm_from = bpm
+	_bpm_to = value
+	_ramp = 0.0
+
+
+func _apply_level_tempo() -> void:
+	set_bpm(float(level.get("bpm", DEFAULT_BPM)))
+	_tempo_zones = level.get("tempo", []).duplicate()
+	_tempo_zones.sort_custom(func(p: Array, q: Array) -> bool: return float(p[0]) < float(q[0]))
+	_tempo_i = 0
+
+
+func _update_tempo_zones() -> void:
+	while _tempo_i < _tempo_zones.size() and player.position.x > float(_tempo_zones[_tempo_i][0]):
+		ramp_bpm(float(_tempo_zones[_tempo_i][1]))
+		_tempo_i += 1
 
 
 func _on_beat() -> void:
@@ -260,6 +305,7 @@ func _load_level(i: int, announce: bool) -> void:
 	level_index = i
 	level = Levels.all()[i]
 	switch_beats = int(level.get("switch_beats", DEFAULT_SWITCH_BEATS))
+	_apply_level_tempo()
 	if world:
 		world.queue_free()
 	world = Node2D.new()
