@@ -80,7 +80,7 @@ A global beat clock at 100 BPM (0.6 s per beat) drives the music and the world; 
 | Element | Status | Behaviour | Teaches |
 | --- | --- | --- | --- |
 | Piano-key ground | Built | Solid; thin pieces (24–30 px) are one-way, so you can jump up through them | Basic platforming |
-| Beat blocks (blue / pink) | Built | Blue is solid for 2 beats, then pink for 2; each blinks in the last 30% before it switches; one-way | Moving in time with the music |
+| Beat blocks (blue / pink) | Built | Colours take turns being solid (4 beats each on level II, 2 elsewhere); in the last 30% of a turn the outgoing colour blinks and the incoming one is already solid, so both overlap; one-way | Moving in time with the music |
 | Hot notes | Built | Touching one melts you instantly | Precision; a cost for panicking |
 | Fall-out | Built | Dropping below the level resets it | Gaps matter |
 | Lemonade glass | Built | Goal; diving in ends the level with a splash and an arpeggio | Clear destination |
@@ -90,7 +90,7 @@ A global beat clock at 100 BPM (0.6 s per beat) drives the music and the world; 
 | Tempo change | Proposed | Later levels raise the BPM (100 → 120 → 140) | Difficulty curve without new rules |
 | Refreezer (snowflake) | Proposed | Pickup that buys extra stillness time once | A rare chance to pause and plan |
 
-Beat-block timing at 100 BPM: each colour is solid for 1.2 s, and a full jump takes about 0.75 s, so one jump fits inside a window with time to spare.
+Beat-block timing at 100 BPM: a 2-beat turn lasts 1.2 s with a 0.36 s overlap; a 4-beat turn lasts 2.4 s with a 0.72 s overlap. A full jump takes about 0.75 s, so a jump started in the overlap always lands on solid ground.
 
 ## Level design
 
@@ -99,7 +99,7 @@ Each level introduces one idea, then tests it once in combination. Levels are na
 | # | Name | New idea | Built | Target length |
 | --- | --- | --- | --- | --- |
 | I | Allegro | Moving, jumping, the 2-second rule | Yes | 30 s |
-| II | Syncopation | Beat blocks | Yes | 45 s |
+| II | Syncopation | Beat blocks: same-colour pairs first, alternating only at the end | Yes | 45 s |
 | III | Fortissimo | Hot notes plus beat blocks over a fire pit | Yes | 60 s |
 | IV | Da Capo | Vertical climb on mixed blocks | Yes | 45 s |
 | V | Accelerando | Tempo rises mid-level; pendulum platforms | Proposed | 60 s |

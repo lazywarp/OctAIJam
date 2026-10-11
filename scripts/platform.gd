@@ -59,15 +59,26 @@ func _draw() -> void:
 		return
 
 	var col := COL_A if kind == Kind.BEAT_A else COL_B
+	var group := 0 if kind == Kind.BEAT_A else 1
 	var sw: float = main.switch_phase
-	var blink := sw > 0.7 and fmod(sw * 20.0, 2.0) < 1.0
-	if active:
+	var own_bar: bool = main.beat_group_on(group)
+	var grace: float = main.SWITCH_GRACE
+	var blink := own_bar and sw > grace and fmod(sw * 20.0, 2.0) < 1.0
+	if active and own_bar:
+		# Current bar: solid, blinking as it is about to leave.
 		_box.bg_color = Color(col, 0.55 if blink else 0.95)
 		_box.border_color = Color.WHITE
 		draw_style_box(_box, r)
 		_draw_note(r.get_center(), Color(INK, 0.7))
+	elif active:
+		# Incoming during the grace overlap: already solid, fading in.
+		var k := clampf((sw - grace) / (1.0 - grace), 0.0, 1.0)
+		_box.bg_color = Color(col, lerpf(0.45, 0.9, k))
+		_box.border_color = Color.WHITE
+		draw_style_box(_box, r)
+		_draw_note(r.get_center(), Color(INK, 0.5))
 	else:
-		_box.bg_color = Color(col, 0.28 if blink else 0.08)
+		_box.bg_color = Color(col, 0.08)
 		_box.border_color = Color(col, 0.5)
 		draw_style_box(_box, r)
 
