@@ -15,6 +15,9 @@ const BPM := 100.0
 const IDLE_LIMIT := 2.0
 const DEFAULT_SWITCH_BEATS := 2
 const SWITCH_GRACE := 0.7 # from this switch_phase on, the incoming beat group is already solid
+const RESTART_MELT := 0.7 # auto-restart delay after melting from stillness
+const RESTART_FAST := 0.5 # auto-restart delay after a sizzle or a fall
+const SKIP_LOCKOUT := 0.2 # a fresh press after this long into dying restarts immediately
 const ROOT_HZ := 523.25 # C5
 const BASS_HZ := 130.81 # C3
 # I - vi - IV - V, as semitones above the root.
@@ -39,6 +42,7 @@ var synth: SynthScript
 
 var _beat_clock := 0.0
 var _state_t := 0.0
+var _dying_t := 0.0 # time since death, for the skip lockout
 var _melody_i := 0
 var _pressed_this_frame := false
 var _goal: GoalScript
@@ -129,6 +133,10 @@ func _process(delta: float) -> void:
 				die("You fell out of tune.")
 		"dying", "win":
 			_state_t -= delta
+			if state == "dying":
+				_dying_t += delta
+				if _dying_t >= SKIP_LOCKOUT and _skip_pressed():
+					_state_t = 0.0
 			if _state_t <= 0.0:
 				if state == "dying":
 					_load_level(level_index, false)
@@ -151,6 +159,12 @@ func _input_active() -> bool:
 		or Input.is_action_pressed("move_left") \
 		or Input.is_action_pressed("move_right") \
 		or Input.is_action_pressed("jump")
+
+
+func _skip_pressed() -> bool:
+	return Input.is_action_just_pressed("jump") \
+		or Input.is_action_just_pressed("move_left") \
+		or Input.is_action_just_pressed("move_right")
 
 
 func level_count() -> int:
@@ -272,12 +286,15 @@ func _add_platform(kind: int, rect: Rect2) -> void:
 func die(reason: String, hot := false) -> void:
 	if state != "play":
 		return
+	# Only a stillness melt gets the longer delay; sizzles and falls restart faster.
+	var delay := RESTART_MELT if idle >= IDLE_LIMIT and not hot else RESTART_FAST
 	state = "dying"
-	_state_t = 1.1
+	_state_t = delay
+	_dying_t = 0.0
 	deaths += 1
 	player.die(hot)
 	synth.play("sizzle" if hot else "melt", 660.0, -4.0)
-	_show(reason, 1.1)
+	_show(reason, delay)
 
 
 func reach_goal() -> void:
