@@ -13,6 +13,7 @@ var _pad_players: Array[AudioStreamPlayer] = []
 var _next := 0
 var _pad_next := 0
 var _cache := {}
+var _stopped := false # set on shutdown: no new sounds
 
 
 func _ready() -> void:
@@ -26,7 +27,20 @@ func _ready() -> void:
 		_pad_players.append(p)
 
 
+# Quitting while voices are mid-note leaves their streams and playbacks alive in the audio
+# server, which Godot reports as leaked objects at exit. main.gd calls this, then waits a
+# moment for the mixer to let go, before quitting.
+func stop_all() -> void:
+	_stopped = true
+	for p in _players + _pad_players:
+		p.stop()
+		p.stream = null
+	_cache.clear()
+
+
 func play(kind: String, freq := 440.0, volume_db := 0.0) -> void:
+	if _stopped:
+		return
 	var p: AudioStreamPlayer
 	if kind == "pad":
 		p = _pad_players[_pad_next]
