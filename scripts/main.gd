@@ -8,7 +8,9 @@ const HeatLampScript := preload("res://scripts/heat_lamp.gd")
 const PendulumScript := preload("res://scripts/pendulum.gd")
 const GoalScript := preload("res://scripts/goal.gd")
 const SignScript := preload("res://scripts/sign.gd")
-const SnowflakeScript := preload("res://scripts/snowflake.gd")
+const ScoreNoteScript := preload("res://scripts/score_note.gd")
+const PowerupScript := preload("res://scripts/powerup.gd")
+const Powerups := preload("res://scripts/powerups.gd")
 const SynthScript := preload("res://scripts/synth.gd")
 const BackgroundScript := preload("res://scripts/background.gd")
 const HudScript := preload("res://scripts/hud.gd")
@@ -30,6 +32,23 @@ const PAD_DB := -18.0 # per pad tone; three play at once, well under ticks and j
 const BEST_PATH := "user://best_times.cfg" # section "best", key = level index
 # I - vi - IV - V, as semitones above the root.
 const CHORDS := [[0, 4, 7], [9, 12, 16], [5, 9, 12], [7, 11, 14]]
+const PLAY_STATES := ["play", "dying", "win"] # a level is running; every other state is a menu screen
+const MENU_REPEAT_DELAY := 0.4 # holding up/down: first repeat after this long...
+const MENU_REPEAT_RATE := 0.14 # ...then one step this often
+# Main menu, top to bottom. "action" is "play", "quit", or the state of the screen the item
+# opens. "soon" marks screens not built yet (M2 Free Play, L3 Custom Levels, M3 Settings):
+# to plug one in, drop its "soon", then handle its state in _process (input) and hud.gd (drawing),
+# and call _to_menu() to come back.
+const MENU := [
+	{"label": "Play", "action": "play"},
+	{"label": "Free Play", "action": "free_play", "soon": true},
+	{"label": "Custom Levels", "action": "custom_levels", "soon": true},
+	{"label": "Settings", "action": "settings", "soon": true},
+	{"label": "Quit", "action": "quit"},
+]
+
+## A score note was collected: its points, and the attempt's new note_points total.
+signal note_collected(points: int, total: int)
 
 var beat := 0
 var beat_phase := 0.0 # 0..1 progress through the current beat
@@ -39,16 +58,21 @@ var bpm := DEFAULT_BPM
 var tempo_flash := 0.0 # 1 -> 0, HUD highlight after a tempo change
 var idle := 0.0
 var deaths := 0
-var has_snow := false # holding a refreezer: the next stillness melt is cancelled once
+var powers: Array[Dictionary] = [] # active power-ups in pickup order: {kind, time_left, duration, charges}
 var level_index := 0
 var level: Dictionary = {}
-var state := "title" # title, play, dying, win, end
+var state := "menu" # menu, play, dying, win, end (and later one per menu screen)
 var message := ""
 var message_t := 0.0
 var level_time := 0.0 # current attempt at this level; resets on death
 var run_times: Array[float] = [] # this run's clear time per level, -1 if not cleared
 var run_new_best: Array[bool] = [] # whether that clear set a new best
 var best_times: Dictionary = {} # level index -> best clear time, persisted
+var menu_index := 0 # highlighted main menu item
+var menu_flash := 0.0 # 1 -> 0, HUD pop when the highlight moves or an item is chosen
+var note_points := 0 # score-note points this attempt; reset on every level (re)load
+var notes_collected := 0
+var notes_total := 0 # score notes placed in the current level
 
 var camera: Camera2D
 var world: Node2D
@@ -69,6 +93,7 @@ var _quitting := false
 var _drip_t := 0.0 # countdown to the next stillness warning drip
 var _goal: GoalScript
 var _lamps: Array[Node] = [] # heat lamps the current player is standing in
+var _menu_hold := 0.0 # countdown to the next auto-repeat step while up/down is held
 
 
 func _ready() -> void:
@@ -107,7 +132,7 @@ func _ready() -> void:
 	hud.main = self
 	hud_layer.add_child(hud)
 
-	# For testing: `godot --path . -- --level 5` skips the title and starts at that level.
+	# For testing: `godot --path . -- --level 5` skips the menu and starts at that level.
 	var args := OS.get_cmdline_user_args()
 	var at := args.find("--level")
 	if at >= 0 and at + 1 < args.size():
@@ -119,11 +144,16 @@ func _setup_input() -> void:
 	_add_action("move_left", [KEY_LEFT, KEY_A], [JOY_BUTTON_DPAD_LEFT], -1.0)
 	_add_action("move_right", [KEY_RIGHT, KEY_D], [JOY_BUTTON_DPAD_RIGHT], 1.0)
 	_add_action("jump", [KEY_SPACE, KEY_UP, KEY_W, KEY_Z], [JOY_BUTTON_A], 0.0)
+	# Menus. The stick needs a firm push (0.5) so a resting stick can't flicker the highlight.
+	_add_action("menu_up", [KEY_UP, KEY_W], [JOY_BUTTON_DPAD_UP], -1.0, JOY_AXIS_LEFT_Y, 0.5)
+	_add_action("menu_down", [KEY_DOWN, KEY_S], [JOY_BUTTON_DPAD_DOWN], 1.0, JOY_AXIS_LEFT_Y, 0.5)
+	_add_action("menu_select", [KEY_SPACE, KEY_ENTER, KEY_KP_ENTER], [JOY_BUTTON_A], 0.0)
 
 
-func _add_action(action: String, keys: Array, buttons: Array, stick_dir: float) -> void:
+func _add_action(action: String, keys: Array, buttons: Array, stick_dir: float,
+		axis := JOY_AXIS_LEFT_X, deadzone := 0.4) -> void:
 	if not InputMap.has_action(action):
-		InputMap.add_action(action, 0.4)
+		InputMap.add_action(action, deadzone)
 	for k in keys:
 		var e := InputEventKey.new()
 		e.physical_keycode = k
@@ -134,7 +164,7 @@ func _add_action(action: String, keys: Array, buttons: Array, stick_dir: float) 
 		InputMap.action_add_event(action, j)
 	if stick_dir != 0.0:
 		var m := InputEventJoypadMotion.new()
-		m.axis = JOY_AXIS_LEFT_X
+		m.axis = axis
 		m.axis_value = stick_dir
 		InputMap.action_add_event(action, m)
 
@@ -180,11 +210,11 @@ func _process(delta: float) -> void:
 	_update_beat(delta)
 	message_t = maxf(message_t - delta, 0.0)
 	tempo_flash = maxf(tempo_flash - delta, 0.0)
+	menu_flash = maxf(menu_flash - delta * 4.0, 0.0)
 
 	match state:
-		"title":
-			if Input.is_action_just_pressed("jump"):
-				_start_game()
+		"menu":
+			_update_menu(delta)
 		"play":
 			level_time += delta
 			if _input_active():
@@ -195,9 +225,8 @@ func _process(delta: float) -> void:
 			player.heated = under_lamp()
 			_update_tempo_zones()
 			_update_drips(delta)
-			if idle >= IDLE_LIMIT and has_snow:
-				_refreeze()
-			elif idle >= IDLE_LIMIT:
+			_update_powers(delta)
+			if idle >= IDLE_LIMIT and not _powers_cancel_melt():
 				die("You stood still. You melted.")
 			elif player.position.y > float(level.get("kill_y", 900.0)):
 				die("You fell out of tune.")
@@ -218,7 +247,7 @@ func _process(delta: float) -> void:
 		"end":
 			_state_t -= delta
 			if _state_t <= 0.0 and Input.is_action_just_pressed("jump"):
-				_start_game()
+				_to_menu()
 
 	_update_camera(delta)
 	_pressed_this_frame = false
@@ -377,6 +406,94 @@ func _on_land() -> void:
 	synth.play("thud", 110.0, -10.0)
 
 
+# --- Menu -------------------------------------------------------------------
+
+## True while a level is running (play, dying, win); false on the menu screens and the end screen.
+func is_playing() -> bool:
+	return PLAY_STATES.has(state)
+
+
+# Up/down moves the highlight (wrapping, auto-repeating while held); select runs it.
+func _update_menu(delta: float) -> void:
+	var dir := 0
+	if Input.is_action_just_pressed("menu_up"):
+		dir = -1
+		_menu_hold = MENU_REPEAT_DELAY
+	elif Input.is_action_just_pressed("menu_down"):
+		dir = 1
+		_menu_hold = MENU_REPEAT_DELAY
+	elif Input.is_action_pressed("menu_up") != Input.is_action_pressed("menu_down"):
+		_menu_hold -= delta
+		if _menu_hold <= 0.0:
+			_menu_hold = MENU_REPEAT_RATE
+			dir = -1 if Input.is_action_pressed("menu_up") else 1
+	if dir != 0:
+		menu_move(dir)
+	if Input.is_action_just_pressed("menu_select"):
+		menu_select(menu_index)
+
+
+## Step the highlight by `dir`, wrapping around the ends.
+func menu_move(dir: int) -> void:
+	menu_highlight(posmod(menu_index + dir, MENU.size()))
+
+
+## Highlight an item directly (the HUD calls this on mouse hover).
+func menu_highlight(i: int) -> void:
+	if i == menu_index:
+		return
+	menu_index = i
+	menu_flash = 1.0
+	synth.play("tick", 2093.0, -12.0) # C7 blip
+
+
+func menu_select(i: int) -> void:
+	if state != "menu":
+		return
+	menu_index = i
+	var item: Dictionary = MENU[i]
+	var action: String = item["action"]
+	if item.get("soon", false):
+		synth.play("thud", 196.0, -8.0)
+		_show("%s: coming soon" % item["label"], 1.4)
+		return
+	menu_flash = 1.0
+	synth.play("chime", 1046.5, -10.0) # C6
+	match action:
+		"play":
+			_start_game()
+		"quit":
+			_quit()
+		_:
+			_open_screen(action)
+
+
+# Switch to a menu screen; its state name is its MENU action.
+func _open_screen(screen: String) -> void:
+	state = screen
+	_state_t = 0.0
+	message_t = 0.0
+
+
+# Back to the main menu: clear away the level so the menu shows over the empty concert hall.
+func _to_menu() -> void:
+	state = "menu"
+	message_t = 0.0
+	if world:
+		world.queue_free()
+		world = null
+	player = null
+	_goal = null
+	_lamps.clear()
+	level = {}
+	idle = 0.0
+	set_bpm(DEFAULT_BPM)
+	_tempo_zones = []
+	camera.limit_bottom = 10000000
+	camera.position = Vector2(640, 360)
+	camera.reset_smoothing()
+
+
 # --- Flow -------------------------------------------------------------------
 
 func _start_game() -> void:
@@ -392,6 +509,7 @@ func _start_game() -> void:
 func _load_level(i: int, announce: bool) -> void:
 	level_index = i
 	level = Levels.all()[i]
+	clear_powers() # before the tempo reset, so an expiring effect can't undo it
 	switch_beats = int(level.get("switch_beats", DEFAULT_SWITCH_BEATS))
 	_apply_level_tempo()
 	if world:
@@ -417,10 +535,12 @@ func _load_level(i: int, announce: bool) -> void:
 		var hz := HazardScript.new()
 		hz.setup(self, r)
 		world.add_child(hz)
-	for p in level.get("snow", []):
-		var sf := SnowflakeScript.new()
-		sf.setup(self, p)
-		world.add_child(sf)
+	_spawn_powerups(level)
+	note_points = 0
+	notes_collected = 0
+	notes_total = 0
+	for nd in level.get("notes", []):
+		add_note(nd[0], str(nd[1]))
 	for s in level.get("signs", []):
 		var sg := SignScript.new()
 		sg.position = s[0]
@@ -439,7 +559,6 @@ func _load_level(i: int, announce: bool) -> void:
 	player.landed.connect(_on_land)
 
 	idle = 0.0
-	has_snow = false
 	_lamps.clear()
 	level_time = 0.0
 	state = "play"
@@ -456,19 +575,151 @@ func _add_platform(kind: int, rect: Rect2) -> void:
 	world.add_child(p)
 
 
-## A snowflake touched the cube. Returns false (and leaves the pickup) if one is already held.
-func collect_snow() -> bool:
-	if state != "play" or has_snow:
+# Pickups from the level's "power" entries, plus "snow" as the old refreezer shorthand.
+func _spawn_powerups(data: Dictionary) -> void:
+	for p in data.get("snow", []):
+		_add_powerup(p, "refreeze")
+	for pw in data.get("power", []):
+		_add_powerup(pw[0], str(pw[1]))
+
+
+func _add_powerup(pos: Vector2, kind: String) -> void:
+	if not Powerups.has(kind):
+		push_warning("%s: unknown power-up kind \"%s\" at %s, skipped" % [level.get("name", "?"), kind, pos])
+		return
+	var pu := PowerupScript.new()
+	pu.setup(self, pos, kind)
+	world.add_child(pu)
+
+
+# --- Power-ups --------------------------------------------------------------
+# Kinds live in powerups.gd. Effects are tracked here; they tick only while playing
+# and are all cleared on every level (re)load.
+
+## A pickup touched the cube. Returns false (and the pickup stays) if the kind is at its
+## max charges and doesn't refresh. Otherwise starts it, adds a charge or restarts its timer.
+func collect_power(kind: String) -> bool:
+	if state != "play" or not Powerups.has(kind):
 		return false
-	has_snow = true
-	synth.play("chime", 1567.98, -14.0) # G6
+	var d := Powerups.def(kind)
+	var fx := get_power(kind)
+	if fx.is_empty():
+		var dur := Powerups.duration(kind)
+		fx = {"kind": kind, "duration": dur, "time_left": dur, "charges": 1}
+		powers.append(fx)
+		_power_hook(kind, "on_activate", [self, fx])
+		return true
+	if int(fx["charges"]) < int(d.get("max", 1)):
+		fx["charges"] = int(fx["charges"]) + 1
+	elif not bool(d.get("refresh", true)):
+		return false
+	fx["time_left"] = fx["duration"]
 	return true
 
 
-# The held snowflake spends itself instead of letting the cube melt from stillness.
-# Only stillness: hazards and falls still kill.
-func _refreeze() -> void:
-	has_snow = false
+## Places a score note in the current world. Unknown types are skipped with a warning.
+func add_note(pos: Vector2, type: String) -> bool:
+	if not ScoreNoteScript.POINTS.has(type):
+		push_warning("Unknown score note type \"%s\" at %s; skipped" % [type, pos])
+		return false
+	var sn := ScoreNoteScript.new()
+	sn.setup(self, pos, type)
+	world.add_child(sn)
+	notes_total += 1
+	return true
+
+
+## A score note touched the cube: add its points and chime chord tones (higher value =
+## higher and more notes). Returns false outside play, so the note stays put.
+func collect_note(type: String) -> bool:
+	if state != "play":
+		return false
+	var points: int = ScoreNoteScript.POINTS[type]
+	note_points += points
+	notes_collected += 1
+	# Chord-tone indices (see _chord_hz): eighths walk the lower octave, quarters the upper,
+	# a half rises a two-note step and a whole plays a three-note arpeggio.
+	var tones: Array = {"eighth": [notes_collected % 3], "quarter": [3 + notes_collected % 3],
+		"half": [2, 4], "whole": [3, 4, 5]}[type]
+	for k in tones.size():
+		var hz := _chord_hz(tones[k])
+		if k == 0:
+			synth.play("pling", hz, -9.0)
+		else:
+			get_tree().create_timer(k * 0.07).timeout.connect(synth.play.bind("pling", hz, -9.0))
+	note_collected.emit(points, note_points)
+	return true
+
+
+## The active effect of this kind, or {} if none.
+func get_power(kind: String) -> Dictionary:
+	for fx in powers:
+		if fx["kind"] == kind:
+			return fx
+	return {}
+
+
+func has_power(kind: String) -> bool:
+	return not get_power(kind).is_empty()
+
+
+## Spends one charge (e.g. an extra jump); the last one ends the effect.
+func use_power(kind: String) -> void:
+	var fx := get_power(kind)
+	if fx.is_empty():
+		return
+	fx["charges"] = int(fx["charges"]) - 1
+	if int(fx["charges"]) <= 0:
+		_end_power(fx, "used")
+
+
+## 0..1 time left, for the HUD timer bar; 1 for "until used" kinds.
+func power_ratio(fx: Dictionary) -> float:
+	var dur: float = fx["duration"]
+	return 1.0 if dur <= 0.0 else clampf(float(fx["time_left"]) / dur, 0.0, 1.0)
+
+
+func clear_powers() -> void:
+	for fx in powers.duplicate():
+		_end_power(fx, "cleared")
+
+
+func _update_powers(delta: float) -> void:
+	for fx in powers.duplicate():
+		if not powers.has(fx):
+			continue # ended by an earlier effect's hook this frame
+		_power_hook(fx["kind"], "on_tick", [self, fx, delta])
+		if float(fx["duration"]) > 0.0:
+			fx["time_left"] = float(fx["time_left"]) - delta
+			if float(fx["time_left"]) <= 0.0:
+				_end_power(fx, "timeout")
+
+
+# Stillness ran out: the first effect whose on_melt hook saves the cube spends a charge.
+func _powers_cancel_melt() -> bool:
+	for fx in powers.duplicate():
+		var saved: Variant = _power_hook(fx["kind"], "on_melt", [self, fx])
+		if saved is bool and saved:
+			use_power(fx["kind"])
+			return true
+	return false
+
+
+func _end_power(fx: Dictionary, reason: String) -> void:
+	if not powers.has(fx):
+		return
+	powers.erase(fx)
+	_power_hook(fx["kind"], "on_expire", [self, fx, reason])
+
+
+func _power_hook(kind: String, hook: String, args: Array) -> Variant:
+	var cb: Callable = Powerups.def(kind).get(hook, Callable())
+	return cb.callv(args) if cb.is_valid() else null
+
+
+## The refreezer's effect: the cube refreezes instead of melting from stillness.
+## Only stillness: hazards and falls still kill.
+func refreeze() -> void:
 	idle = 0.0
 	_drip_t = 0.0
 	player.melt = 0.0
@@ -568,7 +819,7 @@ func _show(text: String, duration: float) -> void:
 
 
 func _update_camera(delta: float) -> void:
-	if state == "title" or not is_instance_valid(player):
+	if not is_instance_valid(player): # menu screens have no level
 		return
 	var lead := clampf(player.velocity.x * 0.35, -180.0, 180.0)
 	var target := player.position + Vector2(lead, -60.0)

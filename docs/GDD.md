@@ -243,17 +243,17 @@ Version 0.02 turns the jam game into a fuller package: a menu with free play, se
 
 | ID | Block | Area | Est. (min) | Depends on | Done when | Status |
 | --- | --- | --- | --- | --- | --- | --- |
-| M1 | Main menu | Menus | 45 | — | Title screen becomes a menu (Play, Free Play, Custom Levels, Settings, Quit), navigable by keyboard and gamepad | In progress |
+| M1 | Main menu | Menus | 45 | — | Title screen becomes a menu (Play, Free Play, Custom Levels, Settings, Quit), navigable by keyboard and gamepad | Done |
 | M2 | Free Play level select | Menus | 30 | M1 | Only levels cleared in Play are unlocked (others show as locked); each shows its best time and best score | Not started |
 | M3 | Settings screen | Menus | 45 | M1 | Separate music and sound-effect volume, fullscreen; saved to user://settings.cfg and applied on launch | Not started |
 | M4 | Pause menu | Menus | 30 | M1 | Esc / gamepad Start pauses (Esc no longer quits); Resume, Exit to main menu, Exit game; the stillness timer, level timer and beat clock freeze while paused | Not started |
-| N1 | Score notes | Score | 40 | — | Collectible notes worth 10 / 25 / 50 / 100 by type; level key "notes"; a pop and a pitched collect sound | In progress |
+| N1 | Score notes | Score | 40 | — | Collectible notes worth 10 / 25 / 50 / 100 by type; level key "notes"; a pop and a pitched collect sound | Done |
 | N2 | Scoring and best scores | Score | 40 | N1 | Level score = note points + time bonus (see design notes); score in the HUD; best score saved per level; shown on the end screen and in Free Play | Not started |
 | N3 | Place notes in levels I–VI | Score | 45 | N1 | Every level has notes, and high-value ones sit off the fastest route | Not started |
-| P1 | Power-up framework | Power-ups | 30 | — | One shared pickup and timed-effect system with a HUD timer; the refreezer snowflake moves onto it | In progress |
+| P1 | Power-up framework | Power-ups | 30 | — | One shared pickup and timed-effect system with a HUD timer; the refreezer snowflake moves onto it | Done |
 | P2 | Three power-ups | Power-ups | 60 | P1 | Grace Note (double jump), Fermata (all beat blocks solid for 5 s), Ritardando (tempo −25% for 8 s) | Not started |
 | P3 | Place power-ups | Power-ups | 30 | P2 | Levels II–VI each have at least one, placed before the section it helps with | Not started |
-| L1 | Level file format | Custom levels | 30 | — | A JSON format mirroring the levels.gd keys; the built-in levels can be exported as example files | In progress |
+| L1 | Level file format | Custom levels | 30 | — | A JSON format mirroring the levels.gd keys; the built-in levels can be exported as example files | Done |
 | L2 | Loader and validation | Custom levels | 45 | L1 | Loads user://levels/*.json; a bad file shows a readable error instead of crashing | Not started |
 | L3 | Custom Levels screen | Custom levels | 30 | L2, M1 | Lists the files found, plays one, shows errors, and opens the levels folder | Not started |
 | T1 | Tutorial level "Prelude" | Tutorial | 60 | N1, P2 | Prompts teach moving, jumping, stillness, holding a key, beat blocks, hot notes, score notes and a power-up; each step advances once done | Not started |
