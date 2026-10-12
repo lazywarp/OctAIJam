@@ -15,6 +15,24 @@ Install [Godot 4](https://godotengine.org/download) (the standard build, not .NE
 
 All art and audio are generated in code, so there are no asset files.
 
+## Builds
+
+Standalone builds for players without Godot. To make them, install the **4.7.2** export templates (Editor → **Manage Export Templates** → Download and Install), then from this folder run:
+
+```sh
+godot --headless --path . --export-release "Linux" builds/linux/Meltronome.x86_64
+godot --headless --path . --export-release "Windows Desktop" builds/windows/Meltronome.exe
+godot --headless --path . --export-release "macOS" builds/macos/Meltronome.zip
+```
+
+Outputs land in `builds/` (git-ignored); the presets live in `export_presets.cfg`. Linux and Windows are single files with the game packed inside. The macOS zip is a universal (Intel + Apple Silicon) `.app`. It is ad-hoc signed, not notarized. Universal macOS builds need `import_etc2_astc` turned on in `project.godot`. Windows icon/version editing is off (`application/modify_resources=false`) so exporting doesn't need `rcedit`.
+
+To play:
+
+- **Linux** — `chmod +x Meltronome.x86_64`, then run it.
+- **Windows** — run `Meltronome.exe`. If SmartScreen warns, click **More info → Run anyway**.
+- **macOS** — unzip, then the first time **right-click `Meltronome.app` → Open** (it isn't notarized, so a double-click is blocked). On macOS 15+, try opening it once, then go to System Settings → Privacy & Security → **Open Anyway**.
+
 ## Controls
 
 | Action | Keys | Gamepad |
