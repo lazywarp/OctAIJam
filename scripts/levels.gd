@@ -16,8 +16,8 @@ extends RefCounted
 ##   snow: [Vector2, ...] - refreezer snowflakes (pickup centres). Holding one (max one)
 ##         cancels the next stillness melt once; hazards and falls still kill. Pickups and
 ##         the held flake reset on every (re)load.
-##   bg: backdrop theme (default "hall"): hall, syncopation, fortissimo, dacapo, accelerando.
-##       See background.gd; accelerando has no corner metronome.
+##   bg: backdrop theme (default "hall"): hall, syncopation, fortissimo, dacapo, accelerando,
+##       finale. See background.gd; accelerando has no corner metronome.
 
 
 static func all() -> Array:
@@ -154,6 +154,77 @@ static func all() -> Array:
 			"signs": [
 				[Vector2(150, 470), "The metronome came loose. Ride it."],
 				[Vector2(1120, 440), "Accelerando: the tempo is rising."],
+			],
+		},
+		{
+			# Everything at once, in four movements: beat blocks over a fire pit (120 BPM);
+			# a hot ledge into three pendulums (130); an island, beat blocks and a key with
+			# hot notes into three more pendulums (140); then a beat-block climb to the glass.
+			# A heat lamp hangs over every spot where you'd wait; snowflakes sit under two.
+			"name": "VI. Finale",
+			"bg": "finale",
+			"bpm": 120.0,
+			"spawn": Vector2(0, 570),
+			"goal": Vector2(5660, -450),
+			"tempo": [[2100.0, 130.0], [3200.0, 140.0]],
+			"solid": [
+				Rect2(-340, 200, 40, 600),
+				Rect2(-300, 600, 800, 200),
+				Rect2(1080, 500, 240, 30),
+				Rect2(1900, 420, 440, 30),
+				Rect2(3180, 360, 200, 30),
+				Rect2(3960, 260, 560, 30),
+				Rect2(5360, 190, 320, 610),
+				Rect2(5760, -50, 140, 24),
+				Rect2(5540, -290, 160, 24),
+				Rect2(5500, -450, 320, 24),
+			],
+			"a": [
+				Rect2(600, 540, 140, 24),
+				Rect2(1420, 450, 140, 24),
+				Rect2(3720, 260, 140, 24),
+				Rect2(5740, 110, 140, 24),
+				Rect2(5540, -130, 140, 24),
+			],
+			"b": [
+				Rect2(840, 480, 140, 24),
+				Rect2(1660, 400, 140, 24),
+				Rect2(3480, 300, 140, 24),
+				Rect2(5540, 30, 140, 24),
+				Rect2(5760, -210, 140, 24),
+				Rect2(5760, -370, 140, 24),
+			],
+			"hot": [
+				Rect2(500, 680, 4860, 120),
+				Rect2(2095, 390, 50, 30),
+				Rect2(4130, 230, 40, 30),
+				Rect2(4330, 230, 40, 30),
+				Rect2(5870, -80, 30, 30),
+			],
+			"pend": [
+				[Vector2(2480, 230), 200.0, 165.0, 0.34, 2.0],
+				[Vector2(2740, 200), 200.0, 165.0, 0.34, 2.0],
+				[Vector2(3000, 170), 200.0, 165.0, 0.34, 2.0],
+				[Vector2(4660, 60), 200.0, 165.0, 0.34, 2.0],
+				[Vector2(4920, 30), 200.0, 165.0, 0.34, 2.0],
+				[Vector2(5180, 0), 200.0, 165.0, 0.34, 2.0],
+			],
+			"lamp": [
+				Rect2(1080, 220, 240, 280),
+				Rect2(2180, 140, 160, 280),
+				Rect2(3180, 100, 200, 260),
+				Rect2(5360, -90, 260, 280),
+			],
+			"snow": [
+				Vector2(2290, 380),
+				Vector2(5440, 150),
+			],
+			"signs": [
+				[Vector2(150, 470), "Finale: everything at once."],
+				[Vector2(940, 340), "The lamps are on you. Keep moving."],
+				[Vector2(2000, 300), "Faster..."],
+				[Vector2(4240, 140), "Fortissimo!"],
+				[Vector2(5490, 110), "Al fine: climb to the last note."],
 			],
 		},
 	]
