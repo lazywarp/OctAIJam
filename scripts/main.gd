@@ -4,6 +4,7 @@ extends Node2D
 const PlayerScript := preload("res://scripts/player.gd")
 const PlatformScript := preload("res://scripts/platform.gd")
 const HazardScript := preload("res://scripts/hazard.gd")
+const HeatLampScript := preload("res://scripts/heat_lamp.gd")
 const PendulumScript := preload("res://scripts/pendulum.gd")
 const GoalScript := preload("res://scripts/goal.gd")
 const SignScript := preload("res://scripts/sign.gd")
@@ -16,6 +17,7 @@ const DEFAULT_BPM := 100.0
 const TEMPO_RAMP_BEATS := 4.0 # a tempo zone eases to its new bpm over one bar
 const IDLE_LIMIT := 2.0
 const DRIP_START := 1.0 # stillness (s) before warning drips begin
+const LAMP_HEAT := 2.0 # stillness fills this many times faster under a heat lamp
 const DEFAULT_SWITCH_BEATS := 2
 const SWITCH_GRACE := 0.7 # from this switch_phase on, the incoming beat group is already solid
 const RESTART_MELT := 0.7 # auto-restart delay after melting from stillness
@@ -23,6 +25,7 @@ const RESTART_FAST := 0.5 # auto-restart delay after a sizzle or a fall
 const SKIP_LOCKOUT := 0.2 # a fresh press after this long into dying restarts immediately
 const ROOT_HZ := 523.25 # C5
 const BASS_HZ := 130.81 # C3
+const PAD_DB := -18.0 # per pad tone; three play at once, well under ticks and jump notes
 const BEST_PATH := "user://best_times.cfg" # section "best", key = level index
 # I - vi - IV - V, as semitones above the root.
 const CHORDS := [[0, 4, 7], [9, 12, 16], [5, 9, 12], [7, 11, 14]]
@@ -62,6 +65,7 @@ var _melody_i := 0
 var _pressed_this_frame := false
 var _drip_t := 0.0 # countdown to the next stillness warning drip
 var _goal: GoalScript
+var _lamps: Array[Node] = [] # heat lamps the current player is standing in
 
 
 func _ready() -> void:
@@ -72,6 +76,13 @@ func _ready() -> void:
 
 	synth = SynthScript.new()
 	add_child(synth)
+	var pad_hz: Array[float] = []
+	for chord: Array in CHORDS:
+		for semis: int in chord:
+			var hz := _pad_hz(semis)
+			if not pad_hz.has(hz):
+				pad_hz.append(hz)
+	synth.prerender("pad", pad_hz)
 
 	var bg_layer := CanvasLayer.new()
 	bg_layer.layer = -10
@@ -160,8 +171,9 @@ func _process(delta: float) -> void:
 			if _input_active():
 				idle = 0.0
 			else:
-				idle += delta
+				idle += delta * heat()
 			player.melt = melt_ratio()
+			player.heated = under_lamp()
 			_update_tempo_zones()
 			_update_drips(delta)
 			if idle >= IDLE_LIMIT:
@@ -218,6 +230,27 @@ func _skip_pressed() -> bool:
 
 func level_count() -> int:
 	return Levels.all().size()
+
+
+## Stillness speed multiplier: LAMP_HEAT under any heat lamp (overlaps don't stack).
+func heat() -> float:
+	return LAMP_HEAT if under_lamp() else 1.0
+
+
+func under_lamp() -> bool:
+	return not _lamps.is_empty()
+
+
+# Lamps report the player entering and leaving. Only lamps in the current world
+# count, and only for the current player, so signals from a level being freed
+# can't leave the heat stuck on.
+func lamp_entered(lamp: Node, body: Node) -> void:
+	if body == player and lamp.get_parent() == world and not _lamps.has(lamp):
+		_lamps.append(lamp)
+
+
+func lamp_exited(lamp: Node) -> void:
+	_lamps.erase(lamp)
 
 
 func melt_ratio() -> float:
@@ -295,6 +328,13 @@ func _on_beat() -> void:
 	if downbeat:
 		var root: int = CHORDS[_bar() % 4][0]
 		synth.play("bass", BASS_HZ * pow(2.0, root / 12.0), -6.0)
+		for semis: int in CHORDS[_bar() % 4]:
+			synth.play("pad", _pad_hz(semis), PAD_DB)
+
+
+## Pad voicing: chord tones folded into G3..F#4 around middle C, for smooth voice leading.
+func _pad_hz(semis: int) -> float:
+	return ROOT_HZ * 0.5 * pow(2.0, (posmod(semis + 5, 12) - 5) / 12.0)
 
 
 func _bar() -> int:
@@ -348,6 +388,10 @@ func _load_level(i: int, announce: bool) -> void:
 		var pn := PendulumScript.new()
 		pn.setup(self, pd[0], pd[1], pd[2], pd[3], float(pd[4]) if pd.size() > 4 else 1.0)
 		world.add_child(pn)
+	for r in level.get("lamp", []):
+		var lp := HeatLampScript.new()
+		lp.setup(self, r)
+		world.add_child(lp)
 	for r in level.get("hot", []):
 		var hz := HazardScript.new()
 		hz.setup(self, r)
@@ -370,6 +414,7 @@ func _load_level(i: int, announce: bool) -> void:
 	player.landed.connect(_on_land)
 
 	idle = 0.0
+	_lamps.clear()
 	level_time = 0.0
 	state = "play"
 	camera.limit_bottom = int(level.get("cam_bottom", 800))

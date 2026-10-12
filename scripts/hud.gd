@@ -73,11 +73,16 @@ func _draw_play_hud(vp: Vector2) -> void:
 	draw_string(font, Vector2(vp.x - 424, 74), timer, HORIZONTAL_ALIGNMENT_RIGHT, 400, 24, Color(1, 1, 1, 0.85))
 
 	var bar := Rect2(vp.x * 0.5 - 180.0, vp.y - 44.0, 360.0, 12.0)
+	# Dark backing so the meter stays readable over ivory piano keys.
+	draw_rect(Rect2(bar.position + Vector2(-16, -32), bar.size + Vector2(32, 42)), Color(0.05, 0.03, 0.1, 0.6))
 	draw_rect(bar, Color(1, 1, 1, 0.12))
 	draw_rect(Rect2(bar.position, Vector2(bar.size.x * k, bar.size.y)), Color("8fe3ff").lerp(Color("ff5a3c"), k))
+	var lamp: bool = main.state == "play" and main.under_lamp()
 	draw_rect(bar, Color(1, 1, 1, 0.5), false, 2.0)
-	var label := "KEEP MOVING!" if k > 0.5 else "stillness"
-	var label_col := Color(1.0, 0.5, 0.4, blink) if k > 0.5 else Color(1, 1, 1, 0.5)
+	if lamp:
+		draw_rect(bar.grow(3.0), Color(1.0, 0.7, 0.28, 0.6 + 0.2 * sin(_t * 6.0)), false, 2.0)
+	var label := "KEEP MOVING!" if k > 0.5 else ("UNDER THE LAMP" if lamp else "stillness")
+	var label_col := Color(1.0, 0.5, 0.4, blink) if k > 0.5 else (Color(1.0, 0.7, 0.28, 0.85) if lamp else Color(1, 1, 1, 0.5))
 	draw_string(font, Vector2(0, bar.position.y - 8.0), label, HORIZONTAL_ALIGNMENT_CENTER, vp.x, 18, label_col)
 
 
