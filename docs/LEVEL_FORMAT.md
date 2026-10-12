@@ -4,13 +4,30 @@ Custom levels are JSON files that mirror the level Dictionaries in [`scripts/lev
 
 The six built-in levels are in [`levels/examples/`](../levels/examples/) (`01_allegro.json` to `06_finale.json`). Copy one as a starting point.
 
-Once the loader exists (block L2), the game will read custom levels from `user://levels/*.json`:
+The game reads custom levels from its `levels` folder; see [Playing your levels](#playing-your-levels).
+
+## Playing your levels
+
+Put your level files in the game's `levels` folder (`user://levels/`). The game creates it the first time it starts:
 
 | OS | Folder |
 | --- | --- |
 | Linux | `~/.local/share/godot/app_userdata/Meltronome/levels/` |
 | Windows | `%APPDATA%\Godot\app_userdata\Meltronome\levels\` |
 | macOS | `~/Library/Application Support/Godot/app_userdata/Meltronome/levels/` |
+
+- If the folder is new or empty, the game puts a `README.txt` and a starter level, `my_first_level.json`, in it. It never overwrites or deletes your files.
+- Every `*.json` file directly in the folder counts as one level. Other files and subfolders are ignored.
+- To test a level straight away, start the game from a terminal with `--custom` after a lone `--`:
+
+  ```sh
+  godot --path . -- --custom my_first_level.json      # from the source folder
+  ./Meltronome.x86_64 -- --custom my_first_level.json  # an exported build
+  ```
+
+  The argument is a file name in the `levels` folder (`.json` can be left off) or a full path. The names of the built-in examples (for example `01_allegro.json`) also work, in exported builds too.
+- Melting restarts your level. Reaching the lemonade shows "Bravo!" and your time, then returns to the main menu. Custom levels never change the best times of the built-in levels.
+- If the file has a mistake, the game prints every error (see [Errors and warnings](#errors-and-warnings)) to the terminal and opens the main menu instead. Warnings are printed too, but the level still plays. Files that aren't UTF-8 text, or are over about 4 MB, are refused without being parsed.
 
 ## Basics
 
@@ -165,5 +182,6 @@ A file with any error isn't loaded. Unknown keys only produce a warning such as 
 - `LevelIO.to_json_text(level)` writes a level Dictionary as JSON, with keys in a fixed order and one list item per line, so files diff cleanly. `LevelIO.to_json_dict(level)` returns the same data as a Dictionary.
 - `LevelIO.from_json_text(text)` returns `{ "ok": bool, "level": Dictionary, "errors": Array[String], "warnings": Array[String] }`. `level` uses the in-game types (`Vector2`, `Rect2`, floats), matches `levels.gd` and is empty unless `ok` is true.
 - Load it with `const LevelIO := preload("res://scripts/level_io.gd")`.
-- `levels/` is in every export preset's `exclude_filter`, so the example files aren't packed into builds.
+- `scripts/custom_levels.gd` reads the files: `scan()` returns one validated entry per file, `{ path, file, name, ok, errors, warnings, level }`, and `load_file(path)` checks a single file. `main.gd`'s `play_custom(level, path)` plays one.
+- Every export preset has `include_filter="levels/examples/*.json"`, so the example files are packed into builds and can be read from `res://levels/examples/`.
 - When you add a level key, add it to `KEY_ORDER` (and `LISTS` if it's a list) in `level_io.gd`, add its validation, and document it here. If an old file would no longer mean the same thing, bump `FORMAT`.
