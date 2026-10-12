@@ -16,6 +16,9 @@ extends RefCounted
 ##   snow: [Vector2, ...] - refreezer snowflakes (pickup centres). Holding one (max one)
 ##         cancels the next stillness melt once; hazards and falls still kill. Pickups and
 ##         the held flake reset on every (re)load.
+##   notes: [[Vector2, type], ...] - score notes (pickup centre, type). Types and points:
+##          "eighth" 10, "quarter" 25, "half" 50, "whole" 100; unknown types are skipped
+##          with a warning. Notes respawn and the attempt's points reset on every (re)load.
 ##   bg: backdrop theme (default "hall"): hall, syncopation, fortissimo, dacapo, accelerando,
 ##       finale. See background.gd; accelerando has no corner metronome.
 
