@@ -299,10 +299,9 @@ Score notes and power-ups both follow the pillar "Never stop": collecting is nev
 
 **Open questions**
 
-- [ ] How much of the 4 hours is left? The schedule assumes about 3 hours.
-- [ ] Should holding a key count as input, or must the player keep pressing new inputs? Holding is the current rule.
-- [ ] Should a death restart the current level (current) or the whole game?
-- [ ] Is the music too sparse with only tick, bass and jump notes?
+- [x] Should holding a key count as input, or must the player keep pressing new inputs? Decided: holding a key counts as input; leave it as is.
+- [x] Should a death restart the current level (current) or the whole game? Decided: the current level.
+- [x] Is the music too sparse with only tick, bass and jump notes? Decided: it's fine (and C4 added a soft chord pad).
 
 **Risks**
 
