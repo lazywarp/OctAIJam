@@ -1,7 +1,9 @@
 extends Node2D
 ## Screen-space UI: title, level name, stillness meter, messages, end screen.
 
-const SnowflakeScript := preload("res://scripts/snowflake.gd")
+const Powerups := preload("res://scripts/powerups.gd")
+const POWER_STEP := 22.0 # spacing of the active power-up icons on the meter panel
+const POWER_MAX := 5 # icons that fit left of the meter label
 
 var main
 var font: Font
@@ -83,12 +85,31 @@ func _draw_play_hud(vp: Vector2) -> void:
 	draw_rect(bar, Color(1, 1, 1, 0.5), false, 2.0)
 	if lamp:
 		draw_rect(bar.grow(3.0), Color(1.0, 0.7, 0.28, 0.6 + 0.2 * sin(_t * 6.0)), false, 2.0)
-	if main.has_snow:
-		# Held refreezer: a small snowflake at the left end of the meter panel.
-		SnowflakeScript.draw_flake(self, bar.position + Vector2(8, -15), 8.0, _t * 0.5, SnowflakeScript.ICE)
+	_draw_powers(bar)
 	var label := "KEEP MOVING!" if k > 0.5 else ("UNDER THE LAMP" if lamp else "stillness")
 	var label_col := Color(1.0, 0.5, 0.4, blink) if k > 0.5 else (Color(1.0, 0.7, 0.28, 0.85) if lamp else Color(1, 1, 1, 0.5))
 	draw_string(font, Vector2(0, bar.position.y - 8.0), label, HORIZONTAL_ALIGNMENT_CENTER, vp.x, 18, label_col)
+
+
+# Active power-ups: a row of small icons at the left end of the meter panel, each with a
+# thin timer bar underneath (full for "until used" kinds). The last 2 s blink.
+func _draw_powers(bar: Rect2) -> void:
+	var n := mini(main.powers.size(), POWER_MAX)
+	for i in n:
+		var fx: Dictionary = main.powers[i]
+		var kind: String = fx["kind"]
+		var c := bar.position + Vector2(8.0 + POWER_STEP * i, -20.0)
+		var timed := float(fx["duration"]) > 0.0
+		var a := 1.0
+		if timed and float(fx["time_left"]) < 2.0:
+			a = 0.45 + 0.55 * absf(cos(_t * 6.0))
+		Powerups.draw_icon(self, kind, c, 7.0, _t * 0.5, Color(Powerups.color(kind), a))
+		var under := Rect2(c + Vector2(-8.0, 10.0), Vector2(16.0, 2.0))
+		draw_rect(under, Color(1, 1, 1, 0.15))
+		var r: float = main.power_ratio(fx)
+		draw_rect(Rect2(under.position, Vector2(under.size.x * r, under.size.y)), Color(Powerups.accent(kind), a))
+		if int(fx["charges"]) > 1:
+			draw_string(font, c + Vector2(5.0, 1.0), str(fx["charges"]), HORIZONTAL_ALIGNMENT_LEFT, -1, 11, Color(1, 1, 1, 0.85))
 
 
 # End screen: this run's time and the best time per level, then the run total.
