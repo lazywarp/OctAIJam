@@ -12,6 +12,7 @@ const ScoreNoteScript := preload("res://scripts/score_note.gd")
 const PowerupScript := preload("res://scripts/powerup.gd")
 const Powerups := preload("res://scripts/powerups.gd")
 const SynthScript := preload("res://scripts/synth.gd")
+const SettingsScript := preload("res://scripts/settings.gd")
 const BackgroundScript := preload("res://scripts/background.gd")
 const HudScript := preload("res://scripts/hud.gd")
 const Levels := preload("res://scripts/levels.gd")
@@ -36,14 +37,14 @@ const PLAY_STATES := ["play", "dying", "win"] # a level is running; every other 
 const MENU_REPEAT_DELAY := 0.4 # holding up/down: first repeat after this long...
 const MENU_REPEAT_RATE := 0.14 # ...then one step this often
 # Main menu, top to bottom. "action" is "play", "quit", or the state of the screen the item
-# opens. "soon" marks screens not built yet (M2 Free Play, L3 Custom Levels, M3 Settings):
+# opens. "soon" marks screens not built yet (M2 Free Play, L3 Custom Levels):
 # to plug one in, drop its "soon", then handle its state in _process (input) and hud.gd (drawing),
 # and call _to_menu() to come back.
 const MENU := [
 	{"label": "Play", "action": "play"},
 	{"label": "Free Play", "action": "free_play", "soon": true},
 	{"label": "Custom Levels", "action": "custom_levels", "soon": true},
-	{"label": "Settings", "action": "settings", "soon": true},
+	{"label": "Settings", "action": "settings"},
 	{"label": "Quit", "action": "quit"},
 ]
 
@@ -78,6 +79,7 @@ var camera: Camera2D
 var world: Node2D
 var player: PlayerScript
 var synth: SynthScript
+var settings: SettingsScript # volumes and fullscreen; also runs the Settings screen
 
 var _beat_clock := 0.0 # progress through the current beat, in beats (0..1)
 var _bpm_from := DEFAULT_BPM
@@ -102,6 +104,11 @@ func _ready() -> void:
 	_setup_input()
 	_load_bests()
 	RenderingServer.set_default_clear_color(Color("17122b"))
+
+	# Loads user://settings.cfg and applies it (creates the Music and SFX buses first).
+	settings = SettingsScript.new()
+	settings.main = self
+	add_child(settings)
 
 	synth = SynthScript.new()
 	add_child(synth)
@@ -174,8 +181,7 @@ func _input(event: InputEvent) -> void:
 		if event.keycode == KEY_ESCAPE:
 			_quit()
 		elif event.keycode == KEY_F11:
-			var full := DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
-			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED if full else DisplayServer.WINDOW_MODE_FULLSCREEN)
+			settings.toggle_fullscreen() # also saves it
 		elif event.keycode == KEY_M:
 			_toggle_mute()
 	elif event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_BACK:
@@ -215,6 +221,8 @@ func _process(delta: float) -> void:
 	match state:
 		"menu":
 			_update_menu(delta)
+		"settings":
+			settings.update(delta)
 		"play":
 			level_time += delta
 			if _input_active():
@@ -444,7 +452,7 @@ func menu_highlight(i: int) -> void:
 		return
 	menu_index = i
 	menu_flash = 1.0
-	synth.play("tick", 2093.0, -12.0) # C7 blip
+	synth.play("blip", 2093.0, -12.0) # C7 blip
 
 
 func menu_select(i: int) -> void:

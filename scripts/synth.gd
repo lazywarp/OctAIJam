@@ -4,9 +4,14 @@ extends Node
 const MIX_RATE := 22050
 const VOICES := 16
 const PAD_VOICES := 6 # long pads get their own pool so they never steal ticks or jump notes
-const LENGTHS := {"tick": 0.05, "thud": 0.15, "note": 0.6, "bass": 1.0, "melt": 0.9, "sizzle": 0.5, "drip": 0.08, "pad": 2.6, "chime": 0.5, "refreeze": 0.7, "pling": 0.45}
+const LENGTHS := {"tick": 0.05, "blip": 0.05, "thud": 0.15, "note": 0.6, "bass": 1.0, "melt": 0.9, "sizzle": 0.5, "drip": 0.08, "pad": 2.6, "chime": 0.5, "refreeze": 0.7, "pling": 0.45}
 const PAD_ATTACK := 0.25
 const PAD_RELEASE := 0.9
+# Mixer buses, both sending to Master. Kinds listed here play on Music (the backing track);
+# every other kind, including any new one, plays on SFX.
+const MUSIC_BUS := "Music"
+const SFX_BUS := "SFX"
+const MUSIC_KINDS := ["tick", "bass", "pad"]
 
 var _players: Array[AudioStreamPlayer] = []
 var _pad_players: Array[AudioStreamPlayer] = []
@@ -17,14 +22,32 @@ var _stopped := false # set on shutdown: no new sounds
 
 
 func _ready() -> void:
+	ensure_buses()
 	for i in VOICES:
 		var p := AudioStreamPlayer.new()
 		add_child(p)
 		_players.append(p)
 	for i in PAD_VOICES:
 		var p := AudioStreamPlayer.new()
+		p.bus = MUSIC_BUS
 		add_child(p)
 		_pad_players.append(p)
+
+
+## Adds the Music and SFX buses (sending to Master) if they don't exist yet. Built in code
+## rather than a bus layout resource, so the mixer is the same in the editor and in exports.
+static func ensure_buses() -> void:
+	for bus_name: String in [MUSIC_BUS, SFX_BUS]:
+		if AudioServer.get_bus_index(bus_name) >= 0:
+			continue
+		AudioServer.add_bus()
+		var i := AudioServer.bus_count - 1
+		AudioServer.set_bus_name(i, bus_name)
+		AudioServer.set_bus_send(i, "Master")
+
+
+static func bus_for(kind: String) -> String:
+	return MUSIC_BUS if MUSIC_KINDS.has(kind) else SFX_BUS
 
 
 # Quitting while voices are mid-note leaves their streams and playbacks alive in the audio
@@ -49,6 +72,7 @@ func play(kind: String, freq := 440.0, volume_db := 0.0) -> void:
 		p = _players[_next]
 		_next = (_next + 1) % VOICES
 	p.stream = _sample(kind, freq)
+	p.bus = bus_for(kind)
 	p.volume_db = volume_db
 	p.play()
 
@@ -73,7 +97,7 @@ func _sample(kind: String, freq: float) -> AudioStreamWAV:
 		var t := float(i) / MIX_RATE
 		var s := 0.0
 		match kind:
-			"tick":
+			"tick", "blip": # the metronome (Music) and the same click for menus (SFX)
 				s = sin(TAU * freq * t) * exp(-t * 90.0)
 			"thud":
 				s = sin(TAU * freq * (1.0 - t * 2.0) * t) * exp(-t * 25.0) * 0.8

@@ -52,6 +52,8 @@ func _draw() -> void:
 	match main.state:
 		"menu":
 			_draw_menu(vp)
+		"settings":
+			_draw_settings(vp)
 		"end":
 			# Dim the last level so the results table stays readable.
 			draw_rect(Rect2(Vector2.ZERO, vp), Color(0.05, 0.03, 0.1, 0.8))
@@ -123,6 +125,71 @@ func _draw_menu(vp: Vector2) -> void:
 		_text(y0 + step * items.size() + 8.0, main.message, 24, Color(1.0, 0.89, 0.48, a))
 	_text(vp.y - 52.0, "Menu: Up / Down, Space / Enter    In game: Move with Arrows / A D, Jump with Space / W", 18, Color(1, 1, 1, 0.6))
 	_text(vp.y - 26.0, "Mute: M    Fullscreen: F11    Quit: Esc", 18, Color(1, 1, 1, 0.6))
+
+
+# Settings screen, styled like the main menu: label on the left, value on the right (a bar
+# and a percentage for volumes, On/Off for fullscreen), the highlighted row in lemon on a
+# soft band between the bobbing cube and note.
+func _draw_settings(vp: Vector2) -> void:
+	var top := vp.y * 0.2
+	_text(top, "SETTINGS", 80, Color("bff3ff"))
+	_text(top + 50, "Tune the concert to your ears.", 24, Color.WHITE)
+
+	var s = main.settings
+	var items: Array = s.ITEMS
+	var y0 := vp.y * 0.43
+	var step := 60.0
+	var cx := vp.x * 0.5
+	var left := cx - 360.0
+	var right := cx + 360.0
+	var pulse := pow(1.0 - float(main.beat_phase), 3.0)
+	var pop: float = main.menu_flash
+	var vpop: float = s.value_flash
+	var lemon := Color("ffe27a")
+	for i in items.size():
+		var item: String = items[i]
+		var label: String = s.LABELS[item]
+		var sel: bool = i == int(s.index)
+		var y := y0 + step * i + (12.0 if item == "back" else 0.0) # Back sits a little apart
+		var size := 34 if sel else 30
+		if sel:
+			size += roundi(4.0 * pop)
+		var col := lemon if sel else Color.WHITE
+		var mid := y - size * 0.36
+		if sel:
+			draw_rect(Rect2(left - 40.0, y - step * 0.7, right - left + 80.0, step * 0.92), Color(1.0, 0.89, 0.48, 0.07 + 0.05 * pulse))
+			var bob := -6.0 * pulse
+			_draw_cube(Vector2(left - 72.0, mid + bob), 30.0 + 4.0 * pulse)
+			_draw_note(Vector2(right + 66.0, mid - bob), lemon)
+		if item == "back":
+			_text(y, label, size, col)
+			continue
+		draw_string_outline(font, Vector2(left, y), label, HORIZONTAL_ALIGNMENT_LEFT, -1, size, 8, Color(0.05, 0.03, 0.1, 0.8))
+		draw_string(font, Vector2(left, y), label, HORIZONTAL_ALIGNMENT_LEFT, -1, size, col)
+		var vsize := size + (roundi(3.0 * vpop) if sel else 0)
+		if item == "fullscreen":
+			var on: bool = s.fullscreen
+			_cell(right, y, "On" if on else "Off", vsize, col if on else Color(1, 1, 1, 0.6), HORIZONTAL_ALIGNMENT_RIGHT)
+			continue
+		var pct: int = s.music if item == "music" else s.sfx
+		_cell(right, y, "%d%%" % pct, vsize, col, HORIZONTAL_ALIGNMENT_RIGHT)
+		# The level bar, with small arrows either side on the highlighted row.
+		var bar := Rect2(right - 310.0, mid - 6.0, 180.0, 12.0)
+		draw_rect(bar.grow(4.0), Color(0.05, 0.03, 0.1, 0.6))
+		draw_rect(bar, Color(1, 1, 1, 0.12))
+		draw_rect(Rect2(bar.position, Vector2(bar.size.x * pct / 100.0, bar.size.y)), lemon if sel else Color("8fe3ff"))
+		for k in range(1, 10): # 10% ticks
+			var x := bar.position.x + bar.size.x * k / 10.0
+			draw_line(Vector2(x, bar.position.y), Vector2(x, bar.end.y), Color(0.05, 0.03, 0.1, 0.35), 1.0)
+		draw_rect(bar, Color(1, 1, 1, 0.5), false, 2.0)
+		if sel:
+			var a := Color(1.0, 0.89, 0.48, 0.9)
+			var ly := bar.get_center().y
+			draw_colored_polygon(PackedVector2Array([Vector2(bar.position.x - 18.0, ly), Vector2(bar.position.x - 10.0, ly - 6.0), Vector2(bar.position.x - 10.0, ly + 6.0)]), a)
+			draw_colored_polygon(PackedVector2Array([Vector2(bar.end.x + 18.0, ly), Vector2(bar.end.x + 10.0, ly - 6.0), Vector2(bar.end.x + 10.0, ly + 6.0)]), a)
+
+	_text(vp.y - 52.0, "Left / Right to adjust  ·  Space / Enter to choose  ·  Esc to go back", 18, Color(1, 1, 1, 0.6))
+	_text(vp.y - 26.0, "Up / Down to move    Mute: M    Fullscreen: F11", 18, Color(1, 1, 1, 0.6))
 
 
 # A little ice cube, like the player: centred on c, side s.
