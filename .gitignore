@@ -8,3 +8,7 @@
 
 # Exported builds
 builds/
+
+# Session logs (local only)
+docs/session-prompts.md
+docs/session-transcript.md
