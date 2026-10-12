@@ -17,6 +17,7 @@ const BackgroundScript := preload("res://scripts/background.gd")
 const HudScript := preload("res://scripts/hud.gd")
 const PauseMenuScript := preload("res://scripts/pause_menu.gd")
 const Levels := preload("res://scripts/levels.gd")
+const CustomLevels := preload("res://scripts/custom_levels.gd")
 
 const DEFAULT_BPM := 100.0
 const TEMPO_RAMP_BEATS := 4.0 # a tempo zone eases to its new bpm over one bar
@@ -77,6 +78,9 @@ var menu_flash := 0.0 # 1 -> 0, HUD pop when the highlight moves or an item is c
 var note_points := 0 # score-note points this attempt; reset on every level (re)load
 var notes_collected := 0
 var notes_total := 0 # score notes placed in the current level
+var custom_source := "" # file of the custom level being played; "" for the built-in levels
+## Called after a custom level is cleared (L3 can point it at its own screen); invalid = _to_menu().
+var custom_return := Callable()
 
 var camera: Camera2D
 var world: Node2D
@@ -160,6 +164,12 @@ func _ready() -> void:
 	if at >= 0 and at + 1 < args.size():
 		_start_game()
 		_load_level(clampi(args[at + 1].to_int() - 1, 0, level_count() - 1), true)
+	CustomLevels.seed_if_empty()
+	# For testing custom levels: `godot --path . -- --custom my_level.json` (a file name in
+	# user://levels/, or a full path) plays that file; errors are printed, then the menu shows.
+	at = args.find("--custom")
+	if at >= 0:
+		_play_custom_arg(args[at + 1] if at + 1 < args.size() else "")
 
 
 func _setup_input() -> void:
@@ -262,7 +272,12 @@ func _process(delta: float) -> void:
 					_state_t = 0.0
 			if _state_t <= 0.0:
 				if state == "dying":
-					_load_level(level_index, false)
+					if is_custom():
+						_build_level(level, false)
+					else:
+						_load_level(level_index, false)
+				elif is_custom():
+					_finish_custom()
 				elif level_index + 1 < Levels.all().size():
 					_load_level(level_index + 1, true)
 				else:
@@ -555,7 +570,13 @@ func _start_game() -> void:
 
 func _load_level(i: int, announce: bool) -> void:
 	level_index = i
-	level = Levels.all()[i]
+	custom_source = ""
+	_build_level(Levels.all()[i], announce)
+
+
+# Builds `data` (a levels.gd-style Dictionary) as the current level and starts playing it.
+func _build_level(data: Dictionary, announce: bool) -> void:
+	level = data
 	clear_powers() # before the tempo reset, so an expiring effect can't undo it
 	switch_beats = int(level.get("switch_beats", DEFAULT_SWITCH_BEATS))
 	_apply_level_tempo()
@@ -798,7 +819,51 @@ func reach_goal() -> void:
 	_goal.celebrate()
 	for k in 6:
 		get_tree().create_timer(k * 0.09, false).timeout.connect(synth.play.bind("note", _chord_hz(k), -5.0))
-	_show("Bravo! New best %s" % format_time(level_time) if _record_clear() else "Bravo!", 1.8)
+	if is_custom():
+		_show("Bravo! %s" % format_time(level_time), 1.8) # custom clears never touch best times
+	else:
+		_show("Bravo! New best %s" % format_time(level_time) if _record_clear() else "Bravo!", 1.8)
+
+
+# --- Custom levels ------------------------------------------------------------
+
+## Plays a custom level (a validated in-game Dictionary, e.g. CustomLevels.load_file()'s
+## "level"). Death reloads it; clearing it calls custom_return (default: the main menu).
+## Built-in progress (run times, best times) is never touched.
+func play_custom(data: Dictionary, source_path := "") -> void:
+	custom_source = source_path if source_path != "" else "custom"
+	deaths = 0
+	_build_level(data, true)
+
+
+## True while the current level is a custom one.
+func is_custom() -> bool:
+	return custom_source != ""
+
+
+func _finish_custom() -> void:
+	custom_source = ""
+	if custom_return.is_valid():
+		custom_return.call()
+	else:
+		_to_menu()
+
+
+# --custom: resolve the argument, validate the file and play it, or print why not.
+func _play_custom_arg(arg: String) -> void:
+	var path := CustomLevels.resolve(arg)
+	var entry: Dictionary = CustomLevels.load_file(path) if path != "" else {}
+	if entry.is_empty() or not bool(entry["ok"]):
+		var errors: Array = entry.get("errors", ["file not found (looked in %s)" % ProjectSettings.globalize_path(CustomLevels.dir_path())])
+		print("Custom level \"%s\" not loaded:" % arg)
+		for e in errors:
+			print("  " + str(e))
+		_show("Custom level not loaded (see the console)", 3.0)
+		return
+	for w in entry["warnings"]:
+		print("%s: warning: %s" % [entry["file"], w])
+	print("Playing custom level \"%s\" from %s" % [entry["name"], path if path.begins_with("res://") else ProjectSettings.globalize_path(path)])
+	play_custom(entry["level"], path)
 
 
 # Stores this run's clear time and updates the saved best. Returns true on a new best.
