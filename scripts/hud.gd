@@ -73,6 +73,8 @@ func _draw_play_hud(vp: Vector2) -> void:
 	draw_string(font, Vector2(vp.x - 424, 74), timer, HORIZONTAL_ALIGNMENT_RIGHT, 400, 24, Color(1, 1, 1, 0.85))
 
 	var bar := Rect2(vp.x * 0.5 - 180.0, vp.y - 44.0, 360.0, 12.0)
+	# Dark backing so the meter stays readable over ivory piano keys.
+	draw_rect(Rect2(bar.position + Vector2(-16, -32), bar.size + Vector2(32, 42)), Color(0.05, 0.03, 0.1, 0.6))
 	draw_rect(bar, Color(1, 1, 1, 0.12))
 	draw_rect(Rect2(bar.position, Vector2(bar.size.x * k, bar.size.y)), Color("8fe3ff").lerp(Color("ff5a3c"), k))
 	var lamp: bool = main.state == "play" and main.under_lamp()

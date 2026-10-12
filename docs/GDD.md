@@ -87,7 +87,7 @@ A global beat clock at 100 BPM (0.6 s per beat) drives the music and the world; 
 | Lemonade glass | Built | Goal; diving in ends the level with a splash and an arpeggio | Clear destination |
 | Hint signs | Built | Text placed in the world | Rules without a tutorial screen |
 | Pendulum platform | Built | Brass slab on a rod from a bolted ceiling beam, swinging with the metronome (optionally at half speed); a dotted arc shows its path | Riding the beat |
-| Heat lamp | Proposed | Melt fills faster while you stand under it | Pressure even while inputting |
+| Heat lamp | Built | Amber stage lamp; under its light cone stillness fills twice as fast (1 s melt); input still resets | Pressure to keep moving through |
 | Tempo change | Built | Later levels raise the BPM (100 → 120 → 140) | Difficulty curve without new rules |
 | Refreezer (snowflake) | Proposed | Pickup that buys extra stillness time once | A rare chance to pause and plan |
 
@@ -128,7 +128,7 @@ All sound is synthesized at startup by `scripts/synth.gd` (22 kHz, 16-voice pool
 | Sizzle | Death by hot note | Yes | Noise burst |
 | Win arpeggio | Reaching the goal | Yes | Six chord tones, 90 ms apart |
 | Stillness warning | Stillness past 1 s | Yes | Drips every 0.35 s at 1 s, down to 0.08 s, pitch 900 to 1300 Hz |
-| Pad / chords layer | Always | Proposed | Soft sustained chord to fill the mix |
+| Pad | Beat 1 of each bar | Yes | Three chord tones around middle C at -18 dB, own 6-voice pool, pre-rendered at startup |
 | Mute | M key, gamepad Back | Yes | Mutes the Master bus; "Muted (M)" shown bottom right |
 
 ## Art direction and UI
@@ -145,12 +145,12 @@ The look is flat, code-drawn shapes on a dark purple concert hall, and colour al
 | Red-orange | #ff5a3c | Hazards, the stillness warning |
 | Lemon | #ffe27a | The goal and wins |
 
-**Background:** a small metronome in the top-right corner swings to an extreme on every tick, behind music staves and floating notes that pulse on the beat, with slight parallax. It used to be large and centred, but in playtesting its arm was confused with the pendulum platforms, so it moved out of the play area.
+**Backgrounds (per level, `"bg"` key):** hall (I, title, end), night-blue stage lights that alternate on the beat (II), maroon glow with rising embers (III), teal organ pipes and repeat signs with vertical parallax (IV), brass dusk with speed streaks that follow the BPM and no metronome (V). All stay faint so platforms read first. A small metronome in the top-right corner swings to an extreme on every tick, behind music staves and floating notes that pulse on the beat, with slight parallax. It used to be large and centred, but in playtesting its arm was confused with the pendulum platforms, so it moved out of the play area.
 
 **HUD**
 
 - Top left: the level name. Top right: level number and melt count.
-- Bottom centre: a stillness meter that fills from ice blue to red, with "KEEP MOVING!" flashing past 50%.
+- Bottom centre: a stillness meter on a dark panel that fills from ice blue to red, with "KEEP MOVING!" flashing past 50% and "UNDER THE LAMP" with a warm outline under a heat lamp.
 - A red screen tint builds past 40% stillness.
 - Centre messages for level names, death reasons and "Bravo!".
 
@@ -227,11 +227,11 @@ The remaining work splits into 14 blocks of 10–40 minutes, each small enough t
 | B2 | Per-level tempo | Should | 20 | — | BPM set per level; beat blocks and music follow it | Done |
 | B3 | Level V: Accelerando | Should | 30 | B1, B2 | Beatable in under 60 s, uses pendulums and a tempo rise | Done |
 | B4 | Best time per level | Should | 20 | — | Timer per level; bests shown on the end screen | Done |
-| C1 | Heat lamps | Could | 20 | — | Stillness fills twice as fast under a lamp | Not started |
+| C1 | Heat lamps | Could | 20 | — | Stillness fills twice as fast under a lamp | Done |
 | C2 | Refreezer pickup | Could | 15 | — | Pickup adds 2 s of stillness allowance once | Not started |
 | C3 | Level VI: Finale | Could | 40 | B1, B2, C1 | All elements at 140 BPM, beatable in under 90 s | Not started |
-| C4 | Music pad layer | Could | 15 | — | Soft chord pad under the bass | Not started |
-| C6 | Per-level backgrounds | Could | 30 | — | Each level sets its own backdrop (e.g. a red stage glow for III, no metronome in V) | Not started |
+| C4 | Music pad layer | Could | 15 | — | Soft chord pad under the bass | Done |
+| C6 | Per-level backgrounds | Could | 30 | — | Each level sets its own backdrop (e.g. a red stage glow for III, no metronome in V) | Done |
 | C5 | Exported builds | Could | 20 | — | Windows, macOS and Linux exports launch | Not started |
 | Z1 | Final playthrough and commit | Must | 20 | All started blocks | Full run start to end; committed and pushed | Not started |
 
