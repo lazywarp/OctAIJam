@@ -23,6 +23,7 @@ const RESTART_FAST := 0.5 # auto-restart delay after a sizzle or a fall
 const SKIP_LOCKOUT := 0.2 # a fresh press after this long into dying restarts immediately
 const ROOT_HZ := 523.25 # C5
 const BASS_HZ := 130.81 # C3
+const PAD_DB := -18.0 # per pad tone; three play at once, well under ticks and jump notes
 const BEST_PATH := "user://best_times.cfg" # section "best", key = level index
 # I - vi - IV - V, as semitones above the root.
 const CHORDS := [[0, 4, 7], [9, 12, 16], [5, 9, 12], [7, 11, 14]]
@@ -72,6 +73,13 @@ func _ready() -> void:
 
 	synth = SynthScript.new()
 	add_child(synth)
+	var pad_hz: Array[float] = []
+	for chord: Array in CHORDS:
+		for semis: int in chord:
+			var hz := _pad_hz(semis)
+			if not pad_hz.has(hz):
+				pad_hz.append(hz)
+	synth.prerender("pad", pad_hz)
 
 	var bg_layer := CanvasLayer.new()
 	bg_layer.layer = -10
@@ -295,6 +303,13 @@ func _on_beat() -> void:
 	if downbeat:
 		var root: int = CHORDS[_bar() % 4][0]
 		synth.play("bass", BASS_HZ * pow(2.0, root / 12.0), -6.0)
+		for semis: int in CHORDS[_bar() % 4]:
+			synth.play("pad", _pad_hz(semis), PAD_DB)
+
+
+## Pad voicing: chord tones folded into G3..F#4 around middle C, for smooth voice leading.
+func _pad_hz(semis: int) -> float:
+	return ROOT_HZ * 0.5 * pow(2.0, (posmod(semis + 5, 12) - 5) / 12.0)
 
 
 func _bar() -> int:
