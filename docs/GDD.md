@@ -15,7 +15,7 @@ Meltronome is a 2D rhythm-platformer: you are an ice cube at a surreal concert, 
 | Engine | Godot 4 (GDScript), GL Compatibility renderer |
 | Platforms | Windows, macOS, Linux; run locally, no submission |
 | Assets | All art and audio generated in code; AI code and assets allowed |
-| Status | Finished: 6 levels, title and end screens with best times; all Must, Should and Could blocks done except C5 (exported builds) |
+| Status | Finished: 6 levels, title and end screens with best times; every block done, including exported builds for Windows, macOS and Linux |
 
 The goal for the rest of the jam is to turn the prototype into a tight, finished-feeling 10-minute experience rather than to add breadth.
 
@@ -232,7 +232,7 @@ The remaining work splits into 14 blocks of 10–40 minutes, each small enough t
 | C3 | Level VI: Finale | Could | 40 | B1, B2, C1 | All elements at 140 BPM, beatable in under 90 s | Done |
 | C4 | Music pad layer | Could | 15 | — | Soft chord pad under the bass | Done |
 | C6 | Per-level backgrounds | Could | 30 | — | Each level sets its own backdrop (e.g. a red stage glow for III, no metronome in V) | Done |
-| C5 | Exported builds | Could | 20 | — | Windows, macOS and Linux exports launch | Not started |
+| C5 | Exported builds | Could | 20 | — | Windows, macOS and Linux exports launch | Done |
 | Z1 | Final playthrough and commit | Must | 20 | All started blocks | Full run start to end; committed and pushed | Done |
 
 Must totals 90 minutes and Should 100 minutes, so Must + Should fits in a 3-hour window with a little slack.
