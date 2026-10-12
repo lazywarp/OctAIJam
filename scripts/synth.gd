@@ -4,7 +4,7 @@ extends Node
 const MIX_RATE := 22050
 const VOICES := 16
 const PAD_VOICES := 6 # long pads get their own pool so they never steal ticks or jump notes
-const LENGTHS := {"tick": 0.05, "thud": 0.15, "note": 0.6, "bass": 1.0, "melt": 0.9, "sizzle": 0.5, "drip": 0.08, "pad": 2.6, "chime": 0.5, "refreeze": 0.7}
+const LENGTHS := {"tick": 0.05, "thud": 0.15, "note": 0.6, "bass": 1.0, "melt": 0.9, "sizzle": 0.5, "drip": 0.08, "pad": 2.6, "chime": 0.5, "refreeze": 0.7, "pling": 0.45}
 const PAD_ATTACK := 0.25
 const PAD_RELEASE := 0.9
 
@@ -105,6 +105,11 @@ func _sample(kind: String, freq: float) -> AudioStreamWAV:
 				phase += TAU * freq * (0.6 + 0.6 * minf(1.0, t / 0.25)) / MIX_RATE
 				s = sin(phase) + 0.4 * sin(phase * 2.0) * (0.5 + 0.5 * sin(TAU * 18.0 * t))
 				s *= exp(-t * 4.5) * 0.35 * minf(1.0, t * 300.0)
+			"pling":
+				# Score-note collect: bright bell with a quick attack and a short shimmer tail.
+				s = sin(TAU * freq * t) + 0.45 * sin(TAU * freq * 2.0 * t) * exp(-t * 12.0) \
+					+ 0.2 * sin(TAU * freq * 3.01 * t) * exp(-t * 20.0)
+				s *= exp(-t * 9.0) * 0.45 * minf(1.0, t * 400.0)
 			"pad":
 				# Warm pad: sine plus a slightly detuned sine (chorus) and a touch of octave,
 				# smooth attack, gently sagging sustain, cosine release to exactly zero.

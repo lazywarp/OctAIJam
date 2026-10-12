@@ -9,6 +9,7 @@ const PendulumScript := preload("res://scripts/pendulum.gd")
 const GoalScript := preload("res://scripts/goal.gd")
 const SignScript := preload("res://scripts/sign.gd")
 const SnowflakeScript := preload("res://scripts/snowflake.gd")
+const ScoreNoteScript := preload("res://scripts/score_note.gd")
 const SynthScript := preload("res://scripts/synth.gd")
 const BackgroundScript := preload("res://scripts/background.gd")
 const HudScript := preload("res://scripts/hud.gd")
@@ -45,6 +46,9 @@ const MENU := [
 	{"label": "Quit", "action": "quit"},
 ]
 
+## A score note was collected: its points, and the attempt's new note_points total.
+signal note_collected(points: int, total: int)
+
 var beat := 0
 var beat_phase := 0.0 # 0..1 progress through the current beat
 var switch_phase := 0.0 # 0..1 progress until beat platforms flip
@@ -65,6 +69,9 @@ var run_new_best: Array[bool] = [] # whether that clear set a new best
 var best_times: Dictionary = {} # level index -> best clear time, persisted
 var menu_index := 0 # highlighted main menu item
 var menu_flash := 0.0 # 1 -> 0, HUD pop when the highlight moves or an item is chosen
+var note_points := 0 # score-note points this attempt; reset on every level (re)load
+var notes_collected := 0
+var notes_total := 0 # score notes placed in the current level
 
 var camera: Camera2D
 var world: Node2D
@@ -531,6 +538,11 @@ func _load_level(i: int, announce: bool) -> void:
 		var sf := SnowflakeScript.new()
 		sf.setup(self, p)
 		world.add_child(sf)
+	note_points = 0
+	notes_collected = 0
+	notes_total = 0
+	for nd in level.get("notes", []):
+		add_note(nd[0], str(nd[1]))
 	for s in level.get("signs", []):
 		var sg := SignScript.new()
 		sg.position = s[0]
@@ -572,6 +584,40 @@ func collect_snow() -> bool:
 		return false
 	has_snow = true
 	synth.play("chime", 1567.98, -14.0) # G6
+	return true
+
+
+## Places a score note in the current world. Unknown types are skipped with a warning.
+func add_note(pos: Vector2, type: String) -> bool:
+	if not ScoreNoteScript.POINTS.has(type):
+		push_warning("Unknown score note type \"%s\" at %s; skipped" % [type, pos])
+		return false
+	var sn := ScoreNoteScript.new()
+	sn.setup(self, pos, type)
+	world.add_child(sn)
+	notes_total += 1
+	return true
+
+
+## A score note touched the cube: add its points and chime chord tones (higher value =
+## higher and more notes). Returns false outside play, so the note stays put.
+func collect_note(type: String) -> bool:
+	if state != "play":
+		return false
+	var points: int = ScoreNoteScript.POINTS[type]
+	note_points += points
+	notes_collected += 1
+	# Chord-tone indices (see _chord_hz): eighths walk the lower octave, quarters the upper,
+	# a half rises a two-note step and a whole plays a three-note arpeggio.
+	var tones: Array = {"eighth": [notes_collected % 3], "quarter": [3 + notes_collected % 3],
+		"half": [2, 4], "whole": [3, 4, 5]}[type]
+	for k in tones.size():
+		var hz := _chord_hz(tones[k])
+		if k == 0:
+			synth.play("pling", hz, -9.0)
+		else:
+			get_tree().create_timer(k * 0.07).timeout.connect(synth.play.bind("pling", hz, -9.0))
+	note_collected.emit(points, note_points)
 	return true
 
 
