@@ -65,6 +65,7 @@ var _state_t := 0.0
 var _dying_t := 0.0 # time since death, for the skip lockout
 var _melody_i := 0
 var _pressed_this_frame := false
+var _quitting := false
 var _drip_t := 0.0 # countdown to the next stillness warning drip
 var _goal: GoalScript
 var _lamps: Array[Node] = [] # heat lamps the current player is standing in
@@ -72,6 +73,7 @@ var _lamps: Array[Node] = [] # heat lamps the current player is standing in
 
 func _ready() -> void:
 	randomize()
+	get_tree().auto_accept_quit = false # the window close button goes through _quit()
 	_setup_input()
 	_load_bests()
 	RenderingServer.set_default_clear_color(Color("17122b"))
@@ -140,7 +142,7 @@ func _add_action(action: String, keys: Array, buttons: Array, stick_dir: float) 
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_ESCAPE:
-			get_tree().quit()
+			_quit()
 		elif event.keycode == KEY_F11:
 			var full := DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
 			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED if full else DisplayServer.WINDOW_MODE_FULLSCREEN)
@@ -152,6 +154,21 @@ func _input(event: InputEvent) -> void:
 		_pressed_this_frame = true
 	elif event is InputEventJoypadMotion and absf(event.axis_value) > 0.5:
 		_pressed_this_frame = true
+
+
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_CLOSE_REQUEST:
+		_quit()
+
+
+# Stop all sound and give the mixer a moment to release it, so nothing leaks at exit.
+func _quit() -> void:
+	if _quitting:
+		return
+	_quitting = true
+	synth.stop_all()
+	await get_tree().create_timer(0.15).timeout
+	get_tree().quit()
 
 
 func _toggle_mute() -> void:
