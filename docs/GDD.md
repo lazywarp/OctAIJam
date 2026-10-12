@@ -237,6 +237,64 @@ The remaining work splits into 14 blocks of 10–40 minutes, each small enough t
 
 Must totals 90 minutes and Should 100 minutes, so Must + Should fits in a 3-hour window with a little slack.
 
+## Version 0.02 work breakdown
+
+Version 0.02 turns the jam game into a fuller package: a menu with free play, settings and a pause menu, a tutorial, custom levels, score notes and power-ups. That's 15 blocks, about 10 hours of work. Blocks with no dependency can run as parallel agents in three waves, then R1 releases alpha-0.02.
+
+| ID | Block | Area | Est. (min) | Depends on | Done when | Status |
+| --- | --- | --- | --- | --- | --- | --- |
+| M1 | Main menu | Menus | 45 | — | Title screen becomes a menu (Play, Free Play, Custom Levels, Settings, Quit), navigable by keyboard and gamepad | Not started |
+| M2 | Free Play level select | Menus | 30 | M1 | Only levels cleared in Play are unlocked (others show as locked); each shows its best time and best score | Not started |
+| M3 | Settings screen | Menus | 45 | M1 | Separate music and sound-effect volume, fullscreen; saved to user://settings.cfg and applied on launch | Not started |
+| M4 | Pause menu | Menus | 30 | M1 | Esc / gamepad Start pauses (Esc no longer quits); Resume, Exit to main menu, Exit game; the stillness timer, level timer and beat clock freeze while paused | Not started |
+| N1 | Score notes | Score | 40 | — | Collectible notes worth 10 / 25 / 50 / 100 by type; level key "notes"; a pop and a pitched collect sound | Not started |
+| N2 | Scoring and best scores | Score | 40 | N1 | Level score = note points + time bonus (see design notes); score in the HUD; best score saved per level; shown on the end screen and in Free Play | Not started |
+| N3 | Place notes in levels I–VI | Score | 45 | N1 | Every level has notes, and high-value ones sit off the fastest route | Not started |
+| P1 | Power-up framework | Power-ups | 30 | — | One shared pickup and timed-effect system with a HUD timer; the refreezer snowflake moves onto it | Not started |
+| P2 | Three power-ups | Power-ups | 60 | P1 | Grace Note (double jump), Fermata (all beat blocks solid for 5 s), Ritardando (tempo −25% for 8 s) | Not started |
+| P3 | Place power-ups | Power-ups | 30 | P2 | Levels II–VI each have at least one, placed before the section it helps with | Not started |
+| L1 | Level file format | Custom levels | 30 | — | A JSON format mirroring the levels.gd keys; the built-in levels can be exported as example files | Not started |
+| L2 | Loader and validation | Custom levels | 45 | L1 | Loads user://levels/*.json; a bad file shows a readable error instead of crashing | Not started |
+| L3 | Custom Levels screen | Custom levels | 30 | L2, M1 | Lists the files found, plays one, shows errors, and opens the levels folder | Not started |
+| T1 | Tutorial level "Prelude" | Tutorial | 60 | N1, P2 | Prompts teach moving, jumping, stillness, holding a key, beat blocks, hot notes, score notes and a power-up; each step advances once done | Not started |
+| R1 | Playtest, tune and release 0.02 | Release | 45 | All | Full playthrough, exports rebuilt, GitHub pre-release alpha-0.02 | Not started |
+
+**Waves for parallel agents:** (1) M1, N1, P1, L1; (2) M2, M3, M4, N2, N3, P2, L2; (3) P3, L3, T1; then R1.
+
+## Version 0.02 design notes
+
+Score notes and power-ups both follow the pillar "Never stop": collecting is never worth standing still for, so the tension is route choice, not waiting.
+
+**Score notes** (proposed values; collected notes stay collected until the level is cleared or reloaded)
+
+| Note | Points | Placement |
+| --- | --- | --- |
+| Eighth note | 10 | Along the main path, in rhythmic runs |
+| Quarter note | 25 | Small detours |
+| Half note | 50 | Risky spots: near hot notes, on pendulum swings |
+| Whole note | 100 | One or two per level, off the fastest route |
+
+**Power-ups** (proposed set; each is a timed effect shown in the HUD)
+
+| Power-up | Effect | Duration | Helps with |
+| --- | --- | --- | --- |
+| Grace Note | One extra mid-air jump | Until used, or 10 s | Gaps, missed pendulums |
+| Fermata | All beat blocks stay solid | 5 s | Beat-block runs |
+| Ritardando | Tempo slows by 25% | 8 s | Pendulums, beat timing |
+| Refreezer (existing) | Cancels the next stillness melt | Until used | Heat lamps, waiting |
+
+**Custom level files:** JSON, using the same keys as `levels.gd` (`solid`, `a`, `b`, `hot`, `pend`, `lamp`, `snow`, `notes`, `bpm`, `tempo`, `bg`, `signs`, `spawn`, `goal`), with rectangles as `[x, y, w, h]` and points as `[x, y]`. Files live in `user://levels/`.
+
+**Scoring:** level score = note points + time bonus. Each level has a par time (about a good clear); the bonus is 20 points per second under par, and 0 at or over par. A whole note (100) is worth a 5-second detour, so grabbing it only pays if the detour is quick: speed and points pull against each other.
+
+**Decisions** (Oct 11, 2026)
+
+- **Free Play unlocking:** a level unlocks in Free Play only after you beat it in Play.
+- **Score:** a combination of note points and a time bonus, forcing a choice between speed and collecting.
+- **Custom levels:** a JSON loader is enough; no in-game editor for 0.02.
+- **Pause menu:** yes, with Resume, Exit to main menu and Exit game (block M4).
+- **Power-ups:** they start appearing in level II.
+
 ## Open questions and risks
 
 **Open questions**
