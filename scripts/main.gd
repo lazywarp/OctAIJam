@@ -8,8 +8,9 @@ const HeatLampScript := preload("res://scripts/heat_lamp.gd")
 const PendulumScript := preload("res://scripts/pendulum.gd")
 const GoalScript := preload("res://scripts/goal.gd")
 const SignScript := preload("res://scripts/sign.gd")
-const SnowflakeScript := preload("res://scripts/snowflake.gd")
 const ScoreNoteScript := preload("res://scripts/score_note.gd")
+const PowerupScript := preload("res://scripts/powerup.gd")
+const Powerups := preload("res://scripts/powerups.gd")
 const SynthScript := preload("res://scripts/synth.gd")
 const BackgroundScript := preload("res://scripts/background.gd")
 const HudScript := preload("res://scripts/hud.gd")
@@ -57,7 +58,7 @@ var bpm := DEFAULT_BPM
 var tempo_flash := 0.0 # 1 -> 0, HUD highlight after a tempo change
 var idle := 0.0
 var deaths := 0
-var has_snow := false # holding a refreezer: the next stillness melt is cancelled once
+var powers: Array[Dictionary] = [] # active power-ups in pickup order: {kind, time_left, duration, charges}
 var level_index := 0
 var level: Dictionary = {}
 var state := "menu" # menu, play, dying, win, end (and later one per menu screen)
@@ -224,9 +225,8 @@ func _process(delta: float) -> void:
 			player.heated = under_lamp()
 			_update_tempo_zones()
 			_update_drips(delta)
-			if idle >= IDLE_LIMIT and has_snow:
-				_refreeze()
-			elif idle >= IDLE_LIMIT:
+			_update_powers(delta)
+			if idle >= IDLE_LIMIT and not _powers_cancel_melt():
 				die("You stood still. You melted.")
 			elif player.position.y > float(level.get("kill_y", 900.0)):
 				die("You fell out of tune.")
@@ -509,6 +509,7 @@ func _start_game() -> void:
 func _load_level(i: int, announce: bool) -> void:
 	level_index = i
 	level = Levels.all()[i]
+	clear_powers() # before the tempo reset, so an expiring effect can't undo it
 	switch_beats = int(level.get("switch_beats", DEFAULT_SWITCH_BEATS))
 	_apply_level_tempo()
 	if world:
@@ -534,10 +535,7 @@ func _load_level(i: int, announce: bool) -> void:
 		var hz := HazardScript.new()
 		hz.setup(self, r)
 		world.add_child(hz)
-	for p in level.get("snow", []):
-		var sf := SnowflakeScript.new()
-		sf.setup(self, p)
-		world.add_child(sf)
+	_spawn_powerups(level)
 	note_points = 0
 	notes_collected = 0
 	notes_total = 0
@@ -561,7 +559,6 @@ func _load_level(i: int, announce: bool) -> void:
 	player.landed.connect(_on_land)
 
 	idle = 0.0
-	has_snow = false
 	_lamps.clear()
 	level_time = 0.0
 	state = "play"
@@ -578,12 +575,45 @@ func _add_platform(kind: int, rect: Rect2) -> void:
 	world.add_child(p)
 
 
-## A snowflake touched the cube. Returns false (and leaves the pickup) if one is already held.
-func collect_snow() -> bool:
-	if state != "play" or has_snow:
+# Pickups from the level's "power" entries, plus "snow" as the old refreezer shorthand.
+func _spawn_powerups(data: Dictionary) -> void:
+	for p in data.get("snow", []):
+		_add_powerup(p, "refreeze")
+	for pw in data.get("power", []):
+		_add_powerup(pw[0], str(pw[1]))
+
+
+func _add_powerup(pos: Vector2, kind: String) -> void:
+	if not Powerups.has(kind):
+		push_warning("%s: unknown power-up kind \"%s\" at %s, skipped" % [level.get("name", "?"), kind, pos])
+		return
+	var pu := PowerupScript.new()
+	pu.setup(self, pos, kind)
+	world.add_child(pu)
+
+
+# --- Power-ups --------------------------------------------------------------
+# Kinds live in powerups.gd. Effects are tracked here; they tick only while playing
+# and are all cleared on every level (re)load.
+
+## A pickup touched the cube. Returns false (and the pickup stays) if the kind is at its
+## max charges and doesn't refresh. Otherwise starts it, adds a charge or restarts its timer.
+func collect_power(kind: String) -> bool:
+	if state != "play" or not Powerups.has(kind):
 		return false
-	has_snow = true
-	synth.play("chime", 1567.98, -14.0) # G6
+	var d := Powerups.def(kind)
+	var fx := get_power(kind)
+	if fx.is_empty():
+		var dur := Powerups.duration(kind)
+		fx = {"kind": kind, "duration": dur, "time_left": dur, "charges": 1}
+		powers.append(fx)
+		_power_hook(kind, "on_activate", [self, fx])
+		return true
+	if int(fx["charges"]) < int(d.get("max", 1)):
+		fx["charges"] = int(fx["charges"]) + 1
+	elif not bool(d.get("refresh", true)):
+		return false
+	fx["time_left"] = fx["duration"]
 	return true
 
 
@@ -621,10 +651,75 @@ func collect_note(type: String) -> bool:
 	return true
 
 
-# The held snowflake spends itself instead of letting the cube melt from stillness.
-# Only stillness: hazards and falls still kill.
-func _refreeze() -> void:
-	has_snow = false
+## The active effect of this kind, or {} if none.
+func get_power(kind: String) -> Dictionary:
+	for fx in powers:
+		if fx["kind"] == kind:
+			return fx
+	return {}
+
+
+func has_power(kind: String) -> bool:
+	return not get_power(kind).is_empty()
+
+
+## Spends one charge (e.g. an extra jump); the last one ends the effect.
+func use_power(kind: String) -> void:
+	var fx := get_power(kind)
+	if fx.is_empty():
+		return
+	fx["charges"] = int(fx["charges"]) - 1
+	if int(fx["charges"]) <= 0:
+		_end_power(fx, "used")
+
+
+## 0..1 time left, for the HUD timer bar; 1 for "until used" kinds.
+func power_ratio(fx: Dictionary) -> float:
+	var dur: float = fx["duration"]
+	return 1.0 if dur <= 0.0 else clampf(float(fx["time_left"]) / dur, 0.0, 1.0)
+
+
+func clear_powers() -> void:
+	for fx in powers.duplicate():
+		_end_power(fx, "cleared")
+
+
+func _update_powers(delta: float) -> void:
+	for fx in powers.duplicate():
+		if not powers.has(fx):
+			continue # ended by an earlier effect's hook this frame
+		_power_hook(fx["kind"], "on_tick", [self, fx, delta])
+		if float(fx["duration"]) > 0.0:
+			fx["time_left"] = float(fx["time_left"]) - delta
+			if float(fx["time_left"]) <= 0.0:
+				_end_power(fx, "timeout")
+
+
+# Stillness ran out: the first effect whose on_melt hook saves the cube spends a charge.
+func _powers_cancel_melt() -> bool:
+	for fx in powers.duplicate():
+		var saved: Variant = _power_hook(fx["kind"], "on_melt", [self, fx])
+		if saved is bool and saved:
+			use_power(fx["kind"])
+			return true
+	return false
+
+
+func _end_power(fx: Dictionary, reason: String) -> void:
+	if not powers.has(fx):
+		return
+	powers.erase(fx)
+	_power_hook(fx["kind"], "on_expire", [self, fx, reason])
+
+
+func _power_hook(kind: String, hook: String, args: Array) -> Variant:
+	var cb: Callable = Powerups.def(kind).get(hook, Callable())
+	return cb.callv(args) if cb.is_valid() else null
+
+
+## The refreezer's effect: the cube refreezes instead of melting from stillness.
+## Only stillness: hazards and falls still kill.
+func refreeze() -> void:
 	idle = 0.0
 	_drip_t = 0.0
 	player.melt = 0.0
