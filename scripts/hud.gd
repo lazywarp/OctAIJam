@@ -9,6 +9,7 @@ var main
 var font: Font
 var _t := 0.0
 var _menu_rects: Array[Rect2] = [] # main menu item hit boxes, from the last draw (for the mouse)
+var _pause_rects: Array[Rect2] = [] # pause menu item hit boxes, likewise
 var _box := StyleBoxFlat.new()
 
 
@@ -16,15 +17,25 @@ func _ready() -> void:
 	font = ThemeDB.fallback_font
 
 
-# Mouse on the main menu: hovering highlights an item, a left click selects it.
+# Mouse on the main menu or the pause menu: hovering highlights an item, a left click selects it.
 func _input(event: InputEvent) -> void:
-	if main.state != "menu":
+	var paused: bool = main.pause_menu.is_open()
+	if main.state != "menu" and not paused:
 		return
 	var mouse_move := event is InputEventMouseMotion
 	var click: bool = event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT
 	if not mouse_move and not click:
 		return
 	var at := get_local_mouse_position()
+	if paused:
+		for i in _pause_rects.size():
+			if _pause_rects[i].has_point(at):
+				if click:
+					main.pause_menu.select(i)
+				else:
+					main.pause_menu.highlight(i)
+				return
+		return
 	for i in _menu_rects.size():
 		if _menu_rects[i].has_point(at):
 			if click:
@@ -63,9 +74,12 @@ func _draw() -> void:
 		_:
 			_draw_play_hud(vp)
 
-	if main.message_t > 0.0 and main.state != "menu": # the menu draws its own, below the items
+	if main.message_t > 0.0 and main.state != "menu" and not main.pause_menu.is_open(): # the menu draws its own
 		var a := clampf(main.message_t * 2.0, 0.0, 1.0)
 		_text(vp.y * 0.28, main.message, 46, Color(1, 1, 1, a))
+
+	if main.pause_menu.is_open():
+		_draw_pause(vp)
 
 	if AudioServer.is_bus_mute(AudioServer.get_bus_index("Master")):
 		var pos := Vector2(vp.x - 224, vp.y - 20)
@@ -123,6 +137,42 @@ func _draw_menu(vp: Vector2) -> void:
 		_text(y0 + step * items.size() + 8.0, main.message, 24, Color(1.0, 0.89, 0.48, a))
 	_text(vp.y - 52.0, "Menu: Up / Down, Space / Enter    In game: Move with Arrows / A D, Jump with Space / W", 18, Color(1, 1, 1, 0.6))
 	_text(vp.y - 26.0, "Mute: M    Fullscreen: F11    Quit: Esc", 18, Color(1, 1, 1, 0.6))
+
+
+# Pause overlay: the frozen level dimmed behind "PAUSED" and the items, highlighted like the
+# main menu. The cube and note bob on the HUD's own clock, since the beat is frozen.
+func _draw_pause(vp: Vector2) -> void:
+	var pm = main.pause_menu
+	draw_rect(Rect2(Vector2.ZERO, vp), Color(0.05, 0.03, 0.1, 0.72))
+	var top := vp.y * 0.3
+	_text(top, "PAUSED", 96, Color("bff3ff"))
+	_text(top + 46, "The concert holds its breath.", 24, Color(1, 1, 1, 0.75))
+
+	var items: Array = pm.ITEMS
+	var y0 := vp.y * 0.53
+	var step := 52.0
+	var cx := vp.x * 0.5
+	var pulse := pow(1.0 - fposmod(_t * 1.2, 1.0), 3.0)
+	var pop: float = pm.flash
+	_pause_rects.clear()
+	for i in items.size():
+		var label: String = items[i]
+		var sel: bool = i == pm.index
+		var y := y0 + step * i
+		var size := 40 if sel else 34
+		if sel:
+			size += roundi(4.0 * pop)
+		var half := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x * 0.5
+		if sel:
+			draw_rect(Rect2(cx - half - 70.0, y - step * 0.72, half * 2.0 + 140.0, step * 0.92), Color(1.0, 0.89, 0.48, 0.07 + 0.05 * pulse))
+		_text(y, label, size, Color("ffe27a") if sel else Color.WHITE)
+		_pause_rects.append(Rect2(cx - 240.0, y - step * 0.68, 480.0, step))
+		if sel:
+			var mid := y - size * 0.36
+			var bob := -6.0 * pulse
+			_draw_cube(Vector2(cx - half - 38.0, mid + bob), 30.0 + 4.0 * pulse)
+			_draw_note(Vector2(cx + half + 30.0, mid - bob), Color("ffe27a"))
+	_text(y0 + step * items.size() + 14.0, "Up / Down, Space / Enter    Resume: Esc", 18, Color(1, 1, 1, 0.6))
 
 
 # A little ice cube, like the player: centred on c, side s.

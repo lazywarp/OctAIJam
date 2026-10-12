@@ -14,6 +14,7 @@ const Powerups := preload("res://scripts/powerups.gd")
 const SynthScript := preload("res://scripts/synth.gd")
 const BackgroundScript := preload("res://scripts/background.gd")
 const HudScript := preload("res://scripts/hud.gd")
+const PauseMenuScript := preload("res://scripts/pause_menu.gd")
 const Levels := preload("res://scripts/levels.gd")
 
 const DEFAULT_BPM := 100.0
@@ -78,6 +79,7 @@ var camera: Camera2D
 var world: Node2D
 var player: PlayerScript
 var synth: SynthScript
+var pause_menu: PauseMenuScript
 
 var _beat_clock := 0.0 # progress through the current beat, in beats (0..1)
 var _bpm_from := DEFAULT_BPM
@@ -104,6 +106,7 @@ func _ready() -> void:
 	RenderingServer.set_default_clear_color(Color("17122b"))
 
 	synth = SynthScript.new()
+	synth.process_mode = Node.PROCESS_MODE_ALWAYS # menu blips and ringing pads while paused
 	add_child(synth)
 	var pad_hz: Array[float] = []
 	for chord: Array in CHORDS:
@@ -127,10 +130,15 @@ func _ready() -> void:
 
 	var hud_layer := CanvasLayer.new()
 	hud_layer.layer = 10
+	hud_layer.process_mode = Node.PROCESS_MODE_ALWAYS # draws the pause overlay
 	add_child(hud_layer)
 	var hud := HudScript.new()
 	hud.main = self
 	hud_layer.add_child(hud)
+
+	pause_menu = PauseMenuScript.new()
+	pause_menu.main = self
+	add_child(pause_menu)
 
 	# For testing: `godot --path . -- --level 5` skips the menu and starts at that level.
 	var args := OS.get_cmdline_user_args()
@@ -172,7 +180,8 @@ func _add_action(action: String, keys: Array, buttons: Array, stick_dir: float,
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_ESCAPE:
-			_quit()
+			if not is_playing(): # in a level, Esc pauses instead (pause_menu.gd)
+				_quit()
 		elif event.keycode == KEY_F11:
 			var full := DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
 			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED if full else DisplayServer.WINDOW_MODE_FULLSCREEN)
@@ -646,7 +655,7 @@ func collect_note(type: String) -> bool:
 		if k == 0:
 			synth.play("pling", hz, -9.0)
 		else:
-			get_tree().create_timer(k * 0.07).timeout.connect(synth.play.bind("pling", hz, -9.0))
+			get_tree().create_timer(k * 0.07, false).timeout.connect(synth.play.bind("pling", hz, -9.0))
 	note_collected.emit(points, note_points)
 	return true
 
@@ -750,7 +759,7 @@ func reach_goal() -> void:
 	player.win()
 	_goal.celebrate()
 	for k in 6:
-		get_tree().create_timer(k * 0.09).timeout.connect(synth.play.bind("note", _chord_hz(k), -5.0))
+		get_tree().create_timer(k * 0.09, false).timeout.connect(synth.play.bind("note", _chord_hz(k), -5.0))
 	_show("Bravo! New best %s" % format_time(level_time) if _record_clear() else "Bravo!", 1.8)
 
 
