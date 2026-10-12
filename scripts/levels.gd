@@ -11,12 +11,15 @@ extends RefCounted
 ##   switch_beats: beats per a/b turn (default 2)
 ##   bpm: starting tempo (default 100), restored on every (re)load
 ##   tempo: [[x, bpm], ...] - first time the player passes x, ease to bpm over one bar
+##   bg: backdrop theme (default "hall"): hall, syncopation, fortissimo, dacapo, accelerando.
+##       See background.gd; accelerando has no corner metronome.
 
 
 static func all() -> Array:
 	return [
 		{
 			"name": "I. Allegro",
+			"bg": "hall",
 			"spawn": Vector2(0, 570),
 			"goal": Vector2(2760, 600),
 			"solid": [
@@ -36,6 +39,7 @@ static func all() -> Array:
 		},
 		{
 			"name": "II. Syncopation",
+			"bg": "syncopation",
 			"spawn": Vector2(0, 570),
 			"goal": Vector2(3020, 420),
 			"switch_beats": 4,
@@ -64,6 +68,7 @@ static func all() -> Array:
 		},
 		{
 			"name": "III. Fortissimo",
+			"bg": "fortissimo",
 			"spawn": Vector2(0, 570),
 			"goal": Vector2(2700, 420),
 			"solid": [
@@ -91,6 +96,7 @@ static func all() -> Array:
 		},
 		{
 			"name": "IV. Da Capo",
+			"bg": "dacapo",
 			"spawn": Vector2(0, 570),
 			"goal": Vector2(1080, -20),
 			"solid": [
@@ -114,6 +120,7 @@ static func all() -> Array:
 		},
 		{
 			"name": "V. Accelerando",
+			"bg": "accelerando",
 			"spawn": Vector2(0, 570),
 			"goal": Vector2(3080, -100),
 			"tempo": [[1100.0, 120.0], [2100.0, 140.0]],
