@@ -294,6 +294,8 @@ Score notes and power-ups both follow the pillar "Never stop": collecting is nev
 - **Custom levels:** a JSON loader is enough; no in-game editor for 0.02.
 - **Pause menu:** yes, with Resume, Exit to main menu and Exit game (block M4).
 - **Power-ups:** they start appearing in level II.
+- **Custom levels folder:** the game creates `user://levels/` (with a README and a starter level) at every launch if it's missing.
+- **Ritardando timing:** it holds 75% tempo for the full 8 s, then eases back up over one bar.
 
 ## Open questions and risks
 
