@@ -14,11 +14,17 @@ const MAX_FALL := 1300.0
 const JUMP_VELOCITY := -640.0
 const COYOTE_TIME := 0.1
 const JUMP_BUFFER := 0.12
+const AIR_JUMP_SCALE := 0.95 # a mid-air jump (Grace Note) is a touch lower than a ground jump
+const AIR_FX_TIME := 0.4
 const INK := Color("1a1424")
 
 var melt := 0.0 # 0..1, how close to melting from standing still
 var heated := false # standing under a heat lamp (main.gd sets this)
 var dead := false
+## Set by a power-up (Grace Note): called on a jump press in mid-air, outside coyote time.
+## Returns true to grant the jump (it spends the charge itself).
+var air_jump := Callable()
+var air_jump_color := Color.WHITE # the mid-air jump's burst
 
 var _shown_melt := 0.0
 var _melt_speed := 2.4
@@ -30,6 +36,8 @@ var _face := 1.0
 var _time := 0.0
 var _box := StyleBoxFlat.new()
 var _frost := 0.0 # 1 -> 0 after a snowflake refreezes the cube
+var _air_fx := 0.0 # 1 -> 0 after a mid-air jump
+var _air_at := Vector2.ZERO # where it happened (the burst stays put as the cube rises)
 
 
 func _ready() -> void:
@@ -82,6 +90,13 @@ func _physics_process(delta: float) -> void:
 		_coyote = 0.0
 		_squash = Vector2(0.7, 1.3)
 		jumped.emit()
+	elif Input.is_action_just_pressed("jump") and air_jump.is_valid() and air_jump.call():
+		# Out of coyote time, so this press can't be a ground jump: spend the grace note.
+		velocity.y = JUMP_VELOCITY * AIR_JUMP_SCALE
+		_buffer = 0.0
+		_squash = Vector2(0.75, 1.25)
+		_air_fx = 1.0
+		_air_at = position + Vector2(0, SIZE * 0.5)
 	if Input.is_action_just_released("jump") and velocity.y < 0.0:
 		velocity.y *= 0.5
 
@@ -99,6 +114,7 @@ func _physics_process(delta: float) -> void:
 func _process(delta: float) -> void:
 	_time += delta
 	_frost = maxf(_frost - delta * 1.8, 0.0)
+	_air_fx = maxf(_air_fx - delta / AIR_FX_TIME, 0.0)
 	var target := 1.0 if dead else melt
 	if target > _shown_melt:
 		_shown_melt = move_toward(_shown_melt, target, delta * (_melt_speed if dead else 10.0))
@@ -115,6 +131,8 @@ func _draw() -> void:
 	if m > 0.02:
 		_ellipse(Vector2(0, bottom - 2.0), Vector2(SIZE * (0.5 + 1.3 * m), 3.0 + 5.0 * m),
 			Color(0.55, 0.85, 1.0, 0.55 * m))
+	if _air_fx > 0.0:
+		_draw_air_burst()
 	if dead and m > 0.97:
 		return
 
@@ -168,6 +186,23 @@ func _draw() -> void:
 			sp + Vector2(0, -6), sp + Vector2(2.6, -1), sp + Vector2(-2.6, -1)
 		]), sc)
 		draw_circle(sp, 2.8, sc)
+
+
+# Mid-air jump: a flat ring kicked out where the cube's feet were, and a fan of little
+# note heads dropping away from it.
+func _draw_air_burst() -> void:
+	var u := 1.0 - _air_fx
+	var c := _air_at - position
+	var ease_u := 1.0 - (1.0 - u) * (1.0 - u)
+	var ring := PackedVector2Array()
+	for i in 25:
+		var a := TAU * i / 24.0
+		ring.append(c + Vector2(cos(a) * (14.0 + 34.0 * ease_u), sin(a) * (4.0 + 7.0 * ease_u)))
+	draw_polyline(ring, Color(air_jump_color, _air_fx), 2.5 * _air_fx + 0.5)
+	for i in 5:
+		var dir := Vector2.from_angle(PI * (0.15 + 0.175 * i))
+		var p := c + dir * (8.0 + 30.0 * ease_u) + Vector2(0, 14.0 * u * u)
+		draw_circle(p, 3.2 * _air_fx + 0.5, Color(air_jump_color.lightened(0.4), _air_fx))
 
 
 func _ellipse(c: Vector2, r: Vector2, col: Color) -> void:

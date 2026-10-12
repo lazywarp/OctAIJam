@@ -54,7 +54,9 @@ var beat := 0
 var beat_phase := 0.0 # 0..1 progress through the current beat
 var switch_phase := 0.0 # 0..1 progress until beat platforms flip
 var switch_beats := DEFAULT_SWITCH_BEATS
-var bpm := DEFAULT_BPM
+var bpm := DEFAULT_BPM # the tempo actually playing: the level's tempo times tempo_scale
+var tempo_scale := 1.0 # power-up multiplier on the level's tempo (Ritardando); see scale_tempo
+var beat_hold := 0.0 # > 0: seconds left of a Fermata, every beat group is solid
 var tempo_flash := 0.0 # 1 -> 0, HUD highlight after a tempo change
 var idle := 0.0
 var deaths := 0
@@ -80,6 +82,11 @@ var player: PlayerScript
 var synth: SynthScript
 
 var _beat_clock := 0.0 # progress through the current beat, in beats (0..1)
+var _base_bpm := DEFAULT_BPM # the level's tempo (start bpm and tempo zones), before tempo_scale
+var _scale_from := 1.0
+var _scale_to := 1.0
+var _scale_ramp := 1.0 # 0..1 progress of the current tempo_scale ease
+var _scale_beats := 1.0
 var _bpm_from := DEFAULT_BPM
 var _bpm_to := DEFAULT_BPM
 var _ramp := 1.0 # 0..1 progress of the current tempo ramp
@@ -312,9 +319,10 @@ func beat_group_on(group: int) -> bool:
 	return floori(float(beat) / switch_beats) % 2 == group
 
 
-## True while the group is solid: its own bar, plus the incoming grace window.
+## True while the group is solid: its own bar, plus the incoming grace window, or always
+## during a Fermata.
 func beat_group_active(group: int) -> bool:
-	return beat_group_on(group) or switch_phase >= SWITCH_GRACE
+	return beat_hold > 0.0 or beat_group_on(group) or switch_phase >= SWITCH_GRACE
 
 
 ## The metronome swing, -1..1, at an extreme on every tick. The background arm and
@@ -331,8 +339,13 @@ func swing(offset := 0.0, beats_per_side := 1.0) -> float:
 func _update_beat(delta: float) -> void:
 	if _ramp < 1.0:
 		_ramp = minf(_ramp + delta * bpm / 60.0 / TEMPO_RAMP_BEATS, 1.0)
-		bpm = lerpf(_bpm_from, _bpm_to, smoothstep(0.0, 1.0, _ramp))
+		_base_bpm = lerpf(_bpm_from, _bpm_to, smoothstep(0.0, 1.0, _ramp))
 		tempo_flash = 1.0
+	if _scale_ramp < 1.0:
+		_scale_ramp = minf(_scale_ramp + delta * bpm / 60.0 / _scale_beats, 1.0)
+		tempo_scale = lerpf(_scale_from, _scale_to, smoothstep(0.0, 1.0, _scale_ramp))
+		tempo_flash = 1.0
+	bpm = _base_bpm * tempo_scale
 	_beat_clock += delta * bpm / 60.0
 	while _beat_clock >= 1.0:
 		_beat_clock -= 1.0
@@ -344,9 +357,10 @@ func _update_beat(delta: float) -> void:
 
 ## Jump straight to a tempo (level start); no ramp.
 func set_bpm(value: float) -> void:
-	if not is_equal_approx(value, bpm):
+	if not is_equal_approx(value * tempo_scale, bpm):
 		tempo_flash = 1.0
-	bpm = value
+	_base_bpm = value
+	bpm = value * tempo_scale
 	_bpm_from = value
 	_bpm_to = value
 	_ramp = 1.0
@@ -354,12 +368,27 @@ func set_bpm(value: float) -> void:
 
 ## Ease from the current tempo to `value` over one bar.
 func ramp_bpm(value: float) -> void:
-	_bpm_from = bpm
+	_bpm_from = _base_bpm
 	_bpm_to = value
 	_ramp = 0.0
 
 
+## Multiply the level's tempo by `value` (1 = as written), easing there over `beats`
+## (0 = at once). Tempo zones keep working underneath: their bpm is scaled too.
+func scale_tempo(value: float, beats := 0.0) -> void:
+	if beats <= 0.0:
+		tempo_scale = value
+		_scale_ramp = 1.0
+		bpm = _base_bpm * tempo_scale
+		return
+	_scale_from = tempo_scale
+	_scale_to = value
+	_scale_beats = beats
+	_scale_ramp = 0.0
+
+
 func _apply_level_tempo() -> void:
+	scale_tempo(1.0) # an effect may still be easing back; the level starts as written
 	set_bpm(float(level.get("bpm", DEFAULT_BPM)))
 	_tempo_zones = level.get("tempo", []).duplicate()
 	_tempo_zones.sort_custom(func(p: Array, q: Array) -> bool: return float(p[0]) < float(q[0]))
@@ -487,6 +516,7 @@ func _to_menu() -> void:
 	_lamps.clear()
 	level = {}
 	idle = 0.0
+	scale_tempo(1.0)
 	set_bpm(DEFAULT_BPM)
 	_tempo_zones = []
 	camera.limit_bottom = 10000000

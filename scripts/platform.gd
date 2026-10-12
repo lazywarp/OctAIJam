@@ -1,6 +1,8 @@
 extends StaticBody2D
 ## Piano-key ground, or note blocks that only exist on alternating bars.
 
+const Powerups := preload("res://scripts/powerups.gd")
+
 enum Kind { SOLID, BEAT_A, BEAT_B }
 
 const WHITE_KEY_W := 40.0
@@ -8,6 +10,7 @@ const BLACK_KEYS := [0, 1, 3, 4, 5] # positions in a 7-key octave followed by a 
 const COL_A := Color("38e0ff")
 const COL_B := Color("ff4fd8")
 const INK := Color("1a1424")
+const HOLD_WARN := 1.0 # a Fermata's last second: blocks about to drop blink
 
 var main
 var kind: int = Kind.SOLID
@@ -64,7 +67,21 @@ func _draw() -> void:
 	var own_bar: bool = main.beat_group_on(group)
 	var grace: float = main.SWITCH_GRACE
 	var blink := own_bar and sw > grace and fmod(sw * 20.0, 2.0) < 1.0
-	if active and own_bar:
+	var hold: float = main.beat_hold
+	if hold > 0.0:
+		# Fermata: every block held fully solid under a fermata. In the last second the ones
+		# that will drop when it ends blink, so nobody is dropped by surprise.
+		var staying := own_bar or sw >= grace
+		var ending := hold < HOLD_WARN and not staying and fmod(hold * 10.0, 1.0) < 0.5
+		var held := Powerups.color("fermata")
+		_box.bg_color = Color(held, 0.22)
+		_box.border_color = Color(held, 0.0)
+		draw_style_box(_box, r.grow(4.0)) # soft lavender halo: held, not just on
+		_box.bg_color = Color(col, 0.5 if ending else 0.95)
+		_box.border_color = held.lerp(Color.WHITE, 0.25)
+		draw_style_box(_box, r)
+		Powerups.draw_fermata(self, r.get_center() + Vector2(0, 1), minf(12.0, size.y * 0.45), 0.0, Color(INK, 0.75))
+	elif active and own_bar:
 		# Current bar: solid, blinking as it is about to leave.
 		_box.bg_color = Color(col, 0.55 if blink else 0.95)
 		_box.border_color = Color.WHITE
