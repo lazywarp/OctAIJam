@@ -4,9 +4,17 @@ extends Node
 const MIX_RATE := 22050
 const VOICES := 16
 const PAD_VOICES := 6 # long pads get their own pool so they never steal ticks or jump notes
-const LENGTHS := {"tick": 0.05, "thud": 0.15, "note": 0.6, "bass": 1.0, "melt": 0.9, "sizzle": 0.5, "drip": 0.08, "pad": 2.6, "chime": 0.5, "refreeze": 0.7, "pling": 0.45}
+const LENGTHS := {"tick": 0.05, "blip": 0.05, "thud": 0.15, "note": 0.6, "bass": 1.0, "melt": 0.9, "sizzle": 0.5, "drip": 0.08, "pad": 2.6, "chime": 0.5, "refreeze": 0.7, "pling": 0.45, "grace": 0.45, "fermata": 1.1, "ritard": 0.85}
+const GRACE_FLICK := 0.045 # the grace note's upper neighbour, before it lands on freq
+const RITARD_ONSETS := [0.0, 0.12, 0.3] # three falling pings, each gap longer: slowing down
+const RITARD_STEPS := [1.0, 0.8909, 0.7491] # 0, -2, -5 semitones
 const PAD_ATTACK := 0.25
 const PAD_RELEASE := 0.9
+# Mixer buses, both sending to Master. Kinds listed here play on Music (the backing track);
+# every other kind, including any new one, plays on SFX.
+const MUSIC_BUS := "Music"
+const SFX_BUS := "SFX"
+const MUSIC_KINDS := ["tick", "bass", "pad"]
 
 var _players: Array[AudioStreamPlayer] = []
 var _pad_players: Array[AudioStreamPlayer] = []
@@ -17,14 +25,32 @@ var _stopped := false # set on shutdown: no new sounds
 
 
 func _ready() -> void:
+	ensure_buses()
 	for i in VOICES:
 		var p := AudioStreamPlayer.new()
 		add_child(p)
 		_players.append(p)
 	for i in PAD_VOICES:
 		var p := AudioStreamPlayer.new()
+		p.bus = MUSIC_BUS
 		add_child(p)
 		_pad_players.append(p)
+
+
+## Adds the Music and SFX buses (sending to Master) if they don't exist yet. Built in code
+## rather than a bus layout resource, so the mixer is the same in the editor and in exports.
+static func ensure_buses() -> void:
+	for bus_name: String in [MUSIC_BUS, SFX_BUS]:
+		if AudioServer.get_bus_index(bus_name) >= 0:
+			continue
+		AudioServer.add_bus()
+		var i := AudioServer.bus_count - 1
+		AudioServer.set_bus_name(i, bus_name)
+		AudioServer.set_bus_send(i, "Master")
+
+
+static func bus_for(kind: String) -> String:
+	return MUSIC_BUS if MUSIC_KINDS.has(kind) else SFX_BUS
 
 
 # Quitting while voices are mid-note leaves their streams and playbacks alive in the audio
@@ -49,6 +75,7 @@ func play(kind: String, freq := 440.0, volume_db := 0.0) -> void:
 		p = _players[_next]
 		_next = (_next + 1) % VOICES
 	p.stream = _sample(kind, freq)
+	p.bus = bus_for(kind)
 	p.volume_db = volume_db
 	p.play()
 
@@ -73,7 +100,7 @@ func _sample(kind: String, freq: float) -> AudioStreamWAV:
 		var t := float(i) / MIX_RATE
 		var s := 0.0
 		match kind:
-			"tick":
+			"tick", "blip": # the metronome (Music) and the same click for menus (SFX)
 				s = sin(TAU * freq * t) * exp(-t * 90.0)
 			"thud":
 				s = sin(TAU * freq * (1.0 - t * 2.0) * t) * exp(-t * 25.0) * 0.8
@@ -110,6 +137,25 @@ func _sample(kind: String, freq: float) -> AudioStreamWAV:
 				s = sin(TAU * freq * t) + 0.45 * sin(TAU * freq * 2.0 * t) * exp(-t * 12.0) \
 					+ 0.2 * sin(TAU * freq * 3.01 * t) * exp(-t * 20.0)
 				s *= exp(-t * 9.0) * 0.45 * minf(1.0, t * 400.0)
+			"grace":
+				# Acciaccatura: a quick flick from a whole tone above, landing on freq.
+				var f := freq * 1.1225 if t < GRACE_FLICK else freq
+				phase += TAU * f / MIX_RATE
+				s = sin(phase) + 0.3 * sin(phase * 2.0) + 0.1 * sin(phase * 3.0)
+				var u := maxf(t - GRACE_FLICK, 0.0)
+				s *= (0.7 * exp(-t * 30.0) if t < GRACE_FLICK else exp(-u * 8.0)) * 0.4 * minf(1.0, t * 400.0)
+			"fermata":
+				# A held open fifth that swells in, then rings out: a pause you can hear.
+				s = sin(TAU * freq * t) + 0.5 * sin(TAU * freq * 1.4983 * t) + 0.25 * sin(TAU * freq * 2.0 * t)
+				s *= minf(1.0, t / 0.08) * exp(-t * 2.6) * (1.0 - t / length) * 0.3
+			"ritard":
+				# Three bell pings stepping down, further apart each time.
+				for k in RITARD_ONSETS.size():
+					var u: float = t - RITARD_ONSETS[k]
+					if u > 0.0:
+						var fk: float = freq * RITARD_STEPS[k]
+						s += (sin(TAU * fk * u) + 0.25 * sin(TAU * fk * 2.0 * u)) * exp(-u * 9.0) * minf(1.0, u * 400.0)
+				s *= 0.3
 			"pad":
 				# Warm pad: sine plus a slightly detuned sine (chorus) and a touch of octave,
 				# smooth attack, gently sagging sustain, cosine release to exactly zero.

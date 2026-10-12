@@ -9,6 +9,7 @@ var main
 var font: Font
 var _t := 0.0
 var _menu_rects: Array[Rect2] = [] # main menu item hit boxes, from the last draw (for the mouse)
+var _pause_rects: Array[Rect2] = [] # pause menu item hit boxes, likewise
 var _box := StyleBoxFlat.new()
 
 
@@ -16,15 +17,25 @@ func _ready() -> void:
 	font = ThemeDB.fallback_font
 
 
-# Mouse on the main menu: hovering highlights an item, a left click selects it.
+# Mouse on the main menu or the pause menu: hovering highlights an item, a left click selects it.
 func _input(event: InputEvent) -> void:
-	if main.state != "menu":
+	var paused: bool = main.pause_menu.is_open()
+	if main.state != "menu" and not paused:
 		return
 	var mouse_move := event is InputEventMouseMotion
 	var click: bool = event is InputEventMouseButton and event.pressed and event.button_index == MOUSE_BUTTON_LEFT
 	if not mouse_move and not click:
 		return
 	var at := get_local_mouse_position()
+	if paused:
+		for i in _pause_rects.size():
+			if _pause_rects[i].has_point(at):
+				if click:
+					main.pause_menu.select(i)
+				else:
+					main.pause_menu.highlight(i)
+				return
+		return
 	for i in _menu_rects.size():
 		if _menu_rects[i].has_point(at):
 			if click:
@@ -52,6 +63,8 @@ func _draw() -> void:
 	match main.state:
 		"menu":
 			_draw_menu(vp)
+		"settings":
+			_draw_settings(vp)
 		"end":
 			# Dim the last level so the results table stays readable.
 			draw_rect(Rect2(Vector2.ZERO, vp), Color(0.05, 0.03, 0.1, 0.8))
@@ -63,9 +76,12 @@ func _draw() -> void:
 		_:
 			_draw_play_hud(vp)
 
-	if main.message_t > 0.0 and main.state != "menu": # the menu draws its own, below the items
+	if main.message_t > 0.0 and main.state != "menu" and not main.pause_menu.is_open(): # the menu draws its own
 		var a := clampf(main.message_t * 2.0, 0.0, 1.0)
 		_text(vp.y * 0.28, main.message, 46, Color(1, 1, 1, a))
+
+	if main.pause_menu.is_open():
+		_draw_pause(vp)
 
 	if AudioServer.is_bus_mute(AudioServer.get_bus_index("Master")):
 		var pos := Vector2(vp.x - 224, vp.y - 20)
@@ -125,6 +141,107 @@ func _draw_menu(vp: Vector2) -> void:
 	_text(vp.y - 26.0, "Mute: M    Fullscreen: F11    Quit: Esc", 18, Color(1, 1, 1, 0.6))
 
 
+# Pause overlay: the frozen level dimmed behind "PAUSED" and the items, highlighted like the
+# main menu. The cube and note bob on the HUD's own clock, since the beat is frozen.
+func _draw_pause(vp: Vector2) -> void:
+	var pm = main.pause_menu
+	draw_rect(Rect2(Vector2.ZERO, vp), Color(0.05, 0.03, 0.1, 0.72))
+	var top := vp.y * 0.3
+	_text(top, "PAUSED", 96, Color("bff3ff"))
+	_text(top + 46, "The concert holds its breath.", 24, Color(1, 1, 1, 0.75))
+
+	var items: Array = pm.ITEMS
+	var y0 := vp.y * 0.53
+	var step := 52.0
+	var cx := vp.x * 0.5
+	var pulse := pow(1.0 - fposmod(_t * 1.2, 1.0), 3.0)
+	var pop: float = pm.flash
+	_pause_rects.clear()
+	for i in items.size():
+		var label: String = items[i]
+		var sel: bool = i == pm.index
+		var y := y0 + step * i
+		var size := 40 if sel else 34
+		if sel:
+			size += roundi(4.0 * pop)
+		var half := font.get_string_size(label, HORIZONTAL_ALIGNMENT_LEFT, -1, size).x * 0.5
+		if sel:
+			draw_rect(Rect2(cx - half - 70.0, y - step * 0.72, half * 2.0 + 140.0, step * 0.92), Color(1.0, 0.89, 0.48, 0.07 + 0.05 * pulse))
+		_text(y, label, size, Color("ffe27a") if sel else Color.WHITE)
+		_pause_rects.append(Rect2(cx - 240.0, y - step * 0.68, 480.0, step))
+		if sel:
+			var mid := y - size * 0.36
+			var bob := -6.0 * pulse
+			_draw_cube(Vector2(cx - half - 38.0, mid + bob), 30.0 + 4.0 * pulse)
+			_draw_note(Vector2(cx + half + 30.0, mid - bob), Color("ffe27a"))
+	_text(y0 + step * items.size() + 14.0, "Up / Down, Space / Enter    Resume: Esc", 18, Color(1, 1, 1, 0.6))
+
+
+# Settings screen, styled like the main menu: label on the left, value on the right (a bar
+# and a percentage for volumes, On/Off for fullscreen), the highlighted row in lemon on a
+# soft band between the bobbing cube and note.
+func _draw_settings(vp: Vector2) -> void:
+	var top := vp.y * 0.2
+	_text(top, "SETTINGS", 80, Color("bff3ff"))
+	_text(top + 50, "Tune the concert to your ears.", 24, Color.WHITE)
+
+	var s = main.settings
+	var items: Array = s.ITEMS
+	var y0 := vp.y * 0.43
+	var step := 60.0
+	var cx := vp.x * 0.5
+	var left := cx - 360.0
+	var right := cx + 360.0
+	var pulse := pow(1.0 - float(main.beat_phase), 3.0)
+	var pop: float = main.menu_flash
+	var vpop: float = s.value_flash
+	var lemon := Color("ffe27a")
+	for i in items.size():
+		var item: String = items[i]
+		var label: String = s.LABELS[item]
+		var sel: bool = i == int(s.index)
+		var y := y0 + step * i + (12.0 if item == "back" else 0.0) # Back sits a little apart
+		var size := 34 if sel else 30
+		if sel:
+			size += roundi(4.0 * pop)
+		var col := lemon if sel else Color.WHITE
+		var mid := y - size * 0.36
+		if sel:
+			draw_rect(Rect2(left - 40.0, y - step * 0.7, right - left + 80.0, step * 0.92), Color(1.0, 0.89, 0.48, 0.07 + 0.05 * pulse))
+			var bob := -6.0 * pulse
+			_draw_cube(Vector2(left - 72.0, mid + bob), 30.0 + 4.0 * pulse)
+			_draw_note(Vector2(right + 66.0, mid - bob), lemon)
+		if item == "back":
+			_text(y, label, size, col)
+			continue
+		draw_string_outline(font, Vector2(left, y), label, HORIZONTAL_ALIGNMENT_LEFT, -1, size, 8, Color(0.05, 0.03, 0.1, 0.8))
+		draw_string(font, Vector2(left, y), label, HORIZONTAL_ALIGNMENT_LEFT, -1, size, col)
+		var vsize := size + (roundi(3.0 * vpop) if sel else 0)
+		if item == "fullscreen":
+			var on: bool = s.fullscreen
+			_cell(right, y, "On" if on else "Off", vsize, col if on else Color(1, 1, 1, 0.6), HORIZONTAL_ALIGNMENT_RIGHT)
+			continue
+		var pct: int = s.music if item == "music" else s.sfx
+		_cell(right, y, "%d%%" % pct, vsize, col, HORIZONTAL_ALIGNMENT_RIGHT)
+		# The level bar, with small arrows either side on the highlighted row.
+		var bar := Rect2(right - 310.0, mid - 6.0, 180.0, 12.0)
+		draw_rect(bar.grow(4.0), Color(0.05, 0.03, 0.1, 0.6))
+		draw_rect(bar, Color(1, 1, 1, 0.12))
+		draw_rect(Rect2(bar.position, Vector2(bar.size.x * pct / 100.0, bar.size.y)), lemon if sel else Color("8fe3ff"))
+		for k in range(1, 10): # 10% ticks
+			var x := bar.position.x + bar.size.x * k / 10.0
+			draw_line(Vector2(x, bar.position.y), Vector2(x, bar.end.y), Color(0.05, 0.03, 0.1, 0.35), 1.0)
+		draw_rect(bar, Color(1, 1, 1, 0.5), false, 2.0)
+		if sel:
+			var a := Color(1.0, 0.89, 0.48, 0.9)
+			var ly := bar.get_center().y
+			draw_colored_polygon(PackedVector2Array([Vector2(bar.position.x - 18.0, ly), Vector2(bar.position.x - 10.0, ly - 6.0), Vector2(bar.position.x - 10.0, ly + 6.0)]), a)
+			draw_colored_polygon(PackedVector2Array([Vector2(bar.end.x + 18.0, ly), Vector2(bar.end.x + 10.0, ly - 6.0), Vector2(bar.end.x + 10.0, ly + 6.0)]), a)
+
+	_text(vp.y - 52.0, "Left / Right to adjust  ·  Space / Enter to choose  ·  Esc to go back", 18, Color(1, 1, 1, 0.6))
+	_text(vp.y - 26.0, "Up / Down to move    Mute: M    Fullscreen: F11", 18, Color(1, 1, 1, 0.6))
+
+
 # A little ice cube, like the player: centred on c, side s.
 func _draw_cube(c: Vector2, s: float) -> void:
 	var rect := Rect2(c - Vector2(s, s) * 0.5, Vector2(s, s))
@@ -165,7 +282,8 @@ func _draw_play_hud(vp: Vector2) -> void:
 	var tempo_size := roundi(lerpf(18.0, 24.0, f))
 	draw_string_outline(font, Vector2(24, 72), tempo, HORIZONTAL_ALIGNMENT_LEFT, -1, tempo_size, 6, Color(0.05, 0.03, 0.1, 0.8))
 	draw_string(font, Vector2(24, 72), tempo, HORIZONTAL_ALIGNMENT_LEFT, -1, tempo_size, Color(1, 1, 1, 0.6).lerp(Color("ffe27a"), f))
-	var right := "Level %d/%d    Melts: %d" % [main.level_index + 1, main.level_count(), main.deaths]
+	var where: String = "Custom" if main.is_custom() else "Level %d/%d" % [main.level_index + 1, main.level_count()]
+	var right := "%s    Melts: %d" % [where, main.deaths]
 	draw_string(font, Vector2(vp.x - 424, 44), right, HORIZONTAL_ALIGNMENT_RIGHT, 400, 24, Color(1, 1, 1, 0.85))
 	var timer: String = main.format_time(main.level_time)
 	draw_string(font, Vector2(vp.x - 424, 74), timer, HORIZONTAL_ALIGNMENT_RIGHT, 400, 24, Color(1, 1, 1, 0.85))

@@ -15,8 +15,14 @@ extends RefCounted
 ##         fills the rect; while the cube is inside, stillness fills twice as fast (1 s melt).
 ##   power: [[Vector2, "kind"], ...] - power-up pickups (centre, kind from powerups.gd).
 ##          Unknown kinds are skipped with a warning. Pickups and active effects reset on
-##          every (re)load. Kinds: "refreeze" - a snowflake; holding one (max one) cancels
-##          the next stillness melt once; hazards and falls still kill.
+##          every (re)load. Kinds:
+##            "refreeze" - a snowflake; holding one (max one) cancels the next stillness
+##                         melt once; hazards and falls still kill.
+##            "grace" - Grace Note: one extra mid-air jump (~110 px up), until used or 10 s;
+##                      lets the cube clear gaps of ~300 px or more.
+##            "fermata" - every beat block (a and b) stays solid for 5 s.
+##            "ritardando" - tempo x0.75 for 8 s (tempo zones still apply, scaled), so
+##                           pendulums, beat blocks and music all slow down.
 ##   snow: [Vector2, ...] - shorthand for power entries of kind "refreeze".
 ##   notes: [[Vector2, type], ...] - score notes (pickup centre, type). Types and points:
 ##          "eighth" 10, "quarter" 25, "half" 50, "whole" 100; unknown types are skipped

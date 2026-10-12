@@ -12,9 +12,12 @@ const ScoreNoteScript := preload("res://scripts/score_note.gd")
 const PowerupScript := preload("res://scripts/powerup.gd")
 const Powerups := preload("res://scripts/powerups.gd")
 const SynthScript := preload("res://scripts/synth.gd")
+const SettingsScript := preload("res://scripts/settings.gd")
 const BackgroundScript := preload("res://scripts/background.gd")
 const HudScript := preload("res://scripts/hud.gd")
+const PauseMenuScript := preload("res://scripts/pause_menu.gd")
 const Levels := preload("res://scripts/levels.gd")
+const CustomLevels := preload("res://scripts/custom_levels.gd")
 
 const DEFAULT_BPM := 100.0
 const TEMPO_RAMP_BEATS := 4.0 # a tempo zone eases to its new bpm over one bar
@@ -36,14 +39,14 @@ const PLAY_STATES := ["play", "dying", "win"] # a level is running; every other 
 const MENU_REPEAT_DELAY := 0.4 # holding up/down: first repeat after this long...
 const MENU_REPEAT_RATE := 0.14 # ...then one step this often
 # Main menu, top to bottom. "action" is "play", "quit", or the state of the screen the item
-# opens. "soon" marks screens not built yet (M2 Free Play, L3 Custom Levels, M3 Settings):
+# opens. "soon" marks screens not built yet (M2 Free Play, L3 Custom Levels):
 # to plug one in, drop its "soon", then handle its state in _process (input) and hud.gd (drawing),
 # and call _to_menu() to come back.
 const MENU := [
 	{"label": "Play", "action": "play"},
 	{"label": "Free Play", "action": "free_play", "soon": true},
 	{"label": "Custom Levels", "action": "custom_levels", "soon": true},
-	{"label": "Settings", "action": "settings", "soon": true},
+	{"label": "Settings", "action": "settings"},
 	{"label": "Quit", "action": "quit"},
 ]
 
@@ -54,7 +57,9 @@ var beat := 0
 var beat_phase := 0.0 # 0..1 progress through the current beat
 var switch_phase := 0.0 # 0..1 progress until beat platforms flip
 var switch_beats := DEFAULT_SWITCH_BEATS
-var bpm := DEFAULT_BPM
+var bpm := DEFAULT_BPM # the tempo actually playing: the level's tempo times tempo_scale
+var tempo_scale := 1.0 # power-up multiplier on the level's tempo (Ritardando); see scale_tempo
+var beat_hold := 0.0 # > 0: seconds left of a Fermata, every beat group is solid
 var tempo_flash := 0.0 # 1 -> 0, HUD highlight after a tempo change
 var idle := 0.0
 var deaths := 0
@@ -73,13 +78,23 @@ var menu_flash := 0.0 # 1 -> 0, HUD pop when the highlight moves or an item is c
 var note_points := 0 # score-note points this attempt; reset on every level (re)load
 var notes_collected := 0
 var notes_total := 0 # score notes placed in the current level
+var custom_source := "" # file of the custom level being played; "" for the built-in levels
+## Called after a custom level is cleared (L3 can point it at its own screen); invalid = _to_menu().
+var custom_return := Callable()
 
 var camera: Camera2D
 var world: Node2D
 var player: PlayerScript
 var synth: SynthScript
+var pause_menu: PauseMenuScript
+var settings: SettingsScript # volumes and fullscreen; also runs the Settings screen
 
 var _beat_clock := 0.0 # progress through the current beat, in beats (0..1)
+var _base_bpm := DEFAULT_BPM # the level's tempo (start bpm and tempo zones), before tempo_scale
+var _scale_from := 1.0
+var _scale_to := 1.0
+var _scale_ramp := 1.0 # 0..1 progress of the current tempo_scale ease
+var _scale_beats := 1.0
 var _bpm_from := DEFAULT_BPM
 var _bpm_to := DEFAULT_BPM
 var _ramp := 1.0 # 0..1 progress of the current tempo ramp
@@ -103,7 +118,13 @@ func _ready() -> void:
 	_load_bests()
 	RenderingServer.set_default_clear_color(Color("17122b"))
 
+	# Loads user://settings.cfg and applies it (creates the Music and SFX buses first).
+	settings = SettingsScript.new()
+	settings.main = self
+	add_child(settings)
+
 	synth = SynthScript.new()
+	synth.process_mode = Node.PROCESS_MODE_ALWAYS # menu blips and ringing pads while paused
 	add_child(synth)
 	var pad_hz: Array[float] = []
 	for chord: Array in CHORDS:
@@ -127,10 +148,15 @@ func _ready() -> void:
 
 	var hud_layer := CanvasLayer.new()
 	hud_layer.layer = 10
+	hud_layer.process_mode = Node.PROCESS_MODE_ALWAYS # draws the pause overlay
 	add_child(hud_layer)
 	var hud := HudScript.new()
 	hud.main = self
 	hud_layer.add_child(hud)
+
+	pause_menu = PauseMenuScript.new()
+	pause_menu.main = self
+	add_child(pause_menu)
 
 	# For testing: `godot --path . -- --level 5` skips the menu and starts at that level.
 	var args := OS.get_cmdline_user_args()
@@ -138,6 +164,12 @@ func _ready() -> void:
 	if at >= 0 and at + 1 < args.size():
 		_start_game()
 		_load_level(clampi(args[at + 1].to_int() - 1, 0, level_count() - 1), true)
+	CustomLevels.seed_if_empty()
+	# For testing custom levels: `godot --path . -- --custom my_level.json` (a file name in
+	# user://levels/, or a full path) plays that file; errors are printed, then the menu shows.
+	at = args.find("--custom")
+	if at >= 0:
+		_play_custom_arg(args[at + 1] if at + 1 < args.size() else "")
 
 
 func _setup_input() -> void:
@@ -172,10 +204,10 @@ func _add_action(action: String, keys: Array, buttons: Array, stick_dir: float,
 func _input(event: InputEvent) -> void:
 	if event is InputEventKey and event.pressed and not event.echo:
 		if event.keycode == KEY_ESCAPE:
-			_quit()
+			if not is_playing(): # in a level, Esc pauses instead (pause_menu.gd)
+				_quit()
 		elif event.keycode == KEY_F11:
-			var full := DisplayServer.window_get_mode() == DisplayServer.WINDOW_MODE_FULLSCREEN
-			DisplayServer.window_set_mode(DisplayServer.WINDOW_MODE_WINDOWED if full else DisplayServer.WINDOW_MODE_FULLSCREEN)
+			settings.toggle_fullscreen() # also saves it
 		elif event.keycode == KEY_M:
 			_toggle_mute()
 	elif event is InputEventJoypadButton and event.pressed and event.button_index == JOY_BUTTON_BACK:
@@ -215,6 +247,8 @@ func _process(delta: float) -> void:
 	match state:
 		"menu":
 			_update_menu(delta)
+		"settings":
+			settings.update(delta)
 		"play":
 			level_time += delta
 			if _input_active():
@@ -238,7 +272,12 @@ func _process(delta: float) -> void:
 					_state_t = 0.0
 			if _state_t <= 0.0:
 				if state == "dying":
-					_load_level(level_index, false)
+					if is_custom():
+						_build_level(level, false)
+					else:
+						_load_level(level_index, false)
+				elif is_custom():
+					_finish_custom()
 				elif level_index + 1 < Levels.all().size():
 					_load_level(level_index + 1, true)
 				else:
@@ -312,9 +351,10 @@ func beat_group_on(group: int) -> bool:
 	return floori(float(beat) / switch_beats) % 2 == group
 
 
-## True while the group is solid: its own bar, plus the incoming grace window.
+## True while the group is solid: its own bar, plus the incoming grace window, or always
+## during a Fermata.
 func beat_group_active(group: int) -> bool:
-	return beat_group_on(group) or switch_phase >= SWITCH_GRACE
+	return beat_hold > 0.0 or beat_group_on(group) or switch_phase >= SWITCH_GRACE
 
 
 ## The metronome swing, -1..1, at an extreme on every tick. The background arm and
@@ -331,8 +371,13 @@ func swing(offset := 0.0, beats_per_side := 1.0) -> float:
 func _update_beat(delta: float) -> void:
 	if _ramp < 1.0:
 		_ramp = minf(_ramp + delta * bpm / 60.0 / TEMPO_RAMP_BEATS, 1.0)
-		bpm = lerpf(_bpm_from, _bpm_to, smoothstep(0.0, 1.0, _ramp))
+		_base_bpm = lerpf(_bpm_from, _bpm_to, smoothstep(0.0, 1.0, _ramp))
 		tempo_flash = 1.0
+	if _scale_ramp < 1.0:
+		_scale_ramp = minf(_scale_ramp + delta * bpm / 60.0 / _scale_beats, 1.0)
+		tempo_scale = lerpf(_scale_from, _scale_to, smoothstep(0.0, 1.0, _scale_ramp))
+		tempo_flash = 1.0
+	bpm = _base_bpm * tempo_scale
 	_beat_clock += delta * bpm / 60.0
 	while _beat_clock >= 1.0:
 		_beat_clock -= 1.0
@@ -344,9 +389,10 @@ func _update_beat(delta: float) -> void:
 
 ## Jump straight to a tempo (level start); no ramp.
 func set_bpm(value: float) -> void:
-	if not is_equal_approx(value, bpm):
+	if not is_equal_approx(value * tempo_scale, bpm):
 		tempo_flash = 1.0
-	bpm = value
+	_base_bpm = value
+	bpm = value * tempo_scale
 	_bpm_from = value
 	_bpm_to = value
 	_ramp = 1.0
@@ -354,12 +400,27 @@ func set_bpm(value: float) -> void:
 
 ## Ease from the current tempo to `value` over one bar.
 func ramp_bpm(value: float) -> void:
-	_bpm_from = bpm
+	_bpm_from = _base_bpm
 	_bpm_to = value
 	_ramp = 0.0
 
 
+## Multiply the level's tempo by `value` (1 = as written), easing there over `beats`
+## (0 = at once). Tempo zones keep working underneath: their bpm is scaled too.
+func scale_tempo(value: float, beats := 0.0) -> void:
+	if beats <= 0.0:
+		tempo_scale = value
+		_scale_ramp = 1.0
+		bpm = _base_bpm * tempo_scale
+		return
+	_scale_from = tempo_scale
+	_scale_to = value
+	_scale_beats = beats
+	_scale_ramp = 0.0
+
+
 func _apply_level_tempo() -> void:
+	scale_tempo(1.0) # an effect may still be easing back; the level starts as written
 	set_bpm(float(level.get("bpm", DEFAULT_BPM)))
 	_tempo_zones = level.get("tempo", []).duplicate()
 	_tempo_zones.sort_custom(func(p: Array, q: Array) -> bool: return float(p[0]) < float(q[0]))
@@ -444,7 +505,7 @@ func menu_highlight(i: int) -> void:
 		return
 	menu_index = i
 	menu_flash = 1.0
-	synth.play("tick", 2093.0, -12.0) # C7 blip
+	synth.play("blip", 2093.0, -12.0) # C7 blip
 
 
 func menu_select(i: int) -> void:
@@ -487,6 +548,7 @@ func _to_menu() -> void:
 	_lamps.clear()
 	level = {}
 	idle = 0.0
+	scale_tempo(1.0)
 	set_bpm(DEFAULT_BPM)
 	_tempo_zones = []
 	camera.limit_bottom = 10000000
@@ -508,7 +570,13 @@ func _start_game() -> void:
 
 func _load_level(i: int, announce: bool) -> void:
 	level_index = i
-	level = Levels.all()[i]
+	custom_source = ""
+	_build_level(Levels.all()[i], announce)
+
+
+# Builds `data` (a levels.gd-style Dictionary) as the current level and starts playing it.
+func _build_level(data: Dictionary, announce: bool) -> void:
+	level = data
 	clear_powers() # before the tempo reset, so an expiring effect can't undo it
 	switch_beats = int(level.get("switch_beats", DEFAULT_SWITCH_BEATS))
 	_apply_level_tempo()
@@ -646,7 +714,7 @@ func collect_note(type: String) -> bool:
 		if k == 0:
 			synth.play("pling", hz, -9.0)
 		else:
-			get_tree().create_timer(k * 0.07).timeout.connect(synth.play.bind("pling", hz, -9.0))
+			get_tree().create_timer(k * 0.07, false).timeout.connect(synth.play.bind("pling", hz, -9.0))
 	note_collected.emit(points, note_points)
 	return true
 
@@ -750,8 +818,52 @@ func reach_goal() -> void:
 	player.win()
 	_goal.celebrate()
 	for k in 6:
-		get_tree().create_timer(k * 0.09).timeout.connect(synth.play.bind("note", _chord_hz(k), -5.0))
-	_show("Bravo! New best %s" % format_time(level_time) if _record_clear() else "Bravo!", 1.8)
+		get_tree().create_timer(k * 0.09, false).timeout.connect(synth.play.bind("note", _chord_hz(k), -5.0))
+	if is_custom():
+		_show("Bravo! %s" % format_time(level_time), 1.8) # custom clears never touch best times
+	else:
+		_show("Bravo! New best %s" % format_time(level_time) if _record_clear() else "Bravo!", 1.8)
+
+
+# --- Custom levels ------------------------------------------------------------
+
+## Plays a custom level (a validated in-game Dictionary, e.g. CustomLevels.load_file()'s
+## "level"). Death reloads it; clearing it calls custom_return (default: the main menu).
+## Built-in progress (run times, best times) is never touched.
+func play_custom(data: Dictionary, source_path := "") -> void:
+	custom_source = source_path if source_path != "" else "custom"
+	deaths = 0
+	_build_level(data, true)
+
+
+## True while the current level is a custom one.
+func is_custom() -> bool:
+	return custom_source != ""
+
+
+func _finish_custom() -> void:
+	custom_source = ""
+	if custom_return.is_valid():
+		custom_return.call()
+	else:
+		_to_menu()
+
+
+# --custom: resolve the argument, validate the file and play it, or print why not.
+func _play_custom_arg(arg: String) -> void:
+	var path := CustomLevels.resolve(arg)
+	var entry: Dictionary = CustomLevels.load_file(path) if path != "" else {}
+	if entry.is_empty() or not bool(entry["ok"]):
+		var errors: Array = entry.get("errors", ["file not found (looked in %s)" % ProjectSettings.globalize_path(CustomLevels.dir_path())])
+		print("Custom level \"%s\" not loaded:" % arg)
+		for e in errors:
+			print("  " + str(e))
+		_show("Custom level not loaded (see the console)", 3.0)
+		return
+	for w in entry["warnings"]:
+		print("%s: warning: %s" % [entry["file"], w])
+	print("Playing custom level \"%s\" from %s" % [entry["name"], path if path.begins_with("res://") else ProjectSettings.globalize_path(path)])
+	play_custom(entry["level"], path)
 
 
 # Stores this run's clear time and updates the saved best. Returns true on a new best.
