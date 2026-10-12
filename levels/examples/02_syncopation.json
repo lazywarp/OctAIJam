@@ -1,0 +1,30 @@
+{
+	"format": 1,
+	"name": "II. Syncopation",
+	"bg": "syncopation",
+	"switch_beats": 4,
+	"spawn": [0, 570],
+	"goal": [3020, 420],
+	"solid": [
+		[-340, 200, 40, 600],
+		[-300, 600, 800, 200],
+		[1080, 600, 260, 200],
+		[1920, 520, 120, 30],
+		[2620, 420, 500, 380]
+	],
+	"a": [
+		[600, 560, 160, 30],
+		[840, 520, 160, 30],
+		[2140, 470, 140, 30]
+	],
+	"b": [
+		[1440, 560, 160, 30],
+		[1680, 520, 140, 30],
+		[2380, 420, 140, 30]
+	],
+	"signs": [
+		[[120, 440], "Blue notes play for four beats, then pink notes take over."],
+		[[120, 476], "Blinking means it's about to switch. Wait on the keys if you need to."],
+		[[1210, 500], "Hold a key while you wait."]
+	]
+}

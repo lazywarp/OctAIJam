@@ -1,0 +1,21 @@
+{
+	"format": 1,
+	"name": "I. Allegro",
+	"bg": "hall",
+	"spawn": [0, 570],
+	"goal": [2760, 600],
+	"solid": [
+		[-340, 200, 40, 600],
+		[-300, 600, 1000, 200],
+		[820, 600, 500, 200],
+		[1440, 540, 300, 260],
+		[1860, 470, 260, 330],
+		[2240, 600, 700, 200]
+	],
+	"signs": [
+		[[120, 440], "Arrows / A D to slide.   Space / W to jump."],
+		[[120, 476], "Stop pressing for 2 seconds and you melt."],
+		[[1070, 500], "Holding a key counts. Letting go doesn't."],
+		[[2560, 500], "Dive into the lemonade."]
+	]
+}
