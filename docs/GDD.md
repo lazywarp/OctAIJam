@@ -89,7 +89,7 @@ A global beat clock at 100 BPM (0.6 s per beat) drives the music and the world; 
 | Pendulum platform | Built | Brass slab on a rod from a bolted ceiling beam, swinging with the metronome (optionally at half speed); a dotted arc shows its path | Riding the beat |
 | Heat lamp | Built | Amber stage lamp; under its light cone stillness fills twice as fast (1 s melt); input still resets | Pressure to keep moving through |
 | Tempo change | Built | Later levels raise the BPM (100 → 120 → 140) | Difficulty curve without new rules |
-| Refreezer (snowflake) | Proposed | Pickup that buys extra stillness time once | A rare chance to pause and plan |
+| Refreezer (snowflake) | Built | Pickup; holding one (max one) cancels the next stillness melt with a refreeze, "Refrozen!" and a chime; hazards and falls still kill | A rare chance to pause and plan |
 
 Beat-block timing at 100 BPM: a 2-beat turn lasts 1.2 s with a 0.36 s overlap; a 4-beat turn lasts 2.4 s with a 0.72 s overlap. A full jump takes about 0.75 s, so a jump started in the overlap always lands on solid ground.
 
@@ -104,7 +104,7 @@ Each level introduces one idea, then tests it once in combination. Levels are na
 | III | Fortissimo | Hot notes plus beat blocks over a fire pit | Yes | 60 s |
 | IV | Da Capo | Vertical climb on mixed blocks | Yes | 45 s |
 | V | Accelerando | Six half-speed pendulums, tempo 100 → 120 → 140, then a vertical climb over beat blocks | Yes | 60 s |
-| VI | Finale | Everything at 140 BPM, heat lamps | Proposed | 90 s |
+| VI | Finale | Everything at once: beat blocks over fire, heat lamps over waiting spots, two pendulum chains, hot keys, a climb; 120 → 130 → 140 BPM; two snowflakes | Yes | 60–90 s |
 
 **Design rules**
 
@@ -145,7 +145,7 @@ The look is flat, code-drawn shapes on a dark purple concert hall, and colour al
 | Red-orange | #ff5a3c | Hazards, the stillness warning |
 | Lemon | #ffe27a | The goal and wins |
 
-**Backgrounds (per level, `"bg"` key):** hall (I, title, end), night-blue stage lights that alternate on the beat (II), maroon glow with rising embers (III), teal organ pipes and repeat signs with vertical parallax (IV), brass dusk with speed streaks that follow the BPM and no metronome (V). All stay faint so platforms read first. A small metronome in the top-right corner swings to an extreme on every tick, behind music staves and floating notes that pulse on the beat, with slight parallax. It used to be large and centred, but in playtesting its arm was confused with the pendulum platforms, so it moved out of the play area.
+**Backgrounds (per level, `"bg"` key):** hall (I, title, end), night-blue stage lights that alternate on the beat (II), maroon glow with rising embers (III), teal organ pipes and repeat signs with vertical parallax (IV), brass dusk with speed streaks that follow the BPM and no metronome (V), crimson curtain, footlights and gold confetti (VI). All stay faint so platforms read first. A small metronome in the top-right corner swings to an extreme on every tick, behind music staves and floating notes that pulse on the beat, with slight parallax. It used to be large and centred, but in playtesting its arm was confused with the pendulum platforms, so it moved out of the play area.
 
 **HUD**
 
@@ -228,8 +228,8 @@ The remaining work splits into 14 blocks of 10–40 minutes, each small enough t
 | B3 | Level V: Accelerando | Should | 30 | B1, B2 | Beatable in under 60 s, uses pendulums and a tempo rise | Done |
 | B4 | Best time per level | Should | 20 | — | Timer per level; bests shown on the end screen | Done |
 | C1 | Heat lamps | Could | 20 | — | Stillness fills twice as fast under a lamp | Done |
-| C2 | Refreezer pickup | Could | 15 | — | Pickup adds 2 s of stillness allowance once | Not started |
-| C3 | Level VI: Finale | Could | 40 | B1, B2, C1 | All elements at 140 BPM, beatable in under 90 s | Not started |
+| C2 | Refreezer pickup | Could | 15 | — | Pickup adds 2 s of stillness allowance once | Done |
+| C3 | Level VI: Finale | Could | 40 | B1, B2, C1 | All elements at 140 BPM, beatable in under 90 s | Done |
 | C4 | Music pad layer | Could | 15 | — | Soft chord pad under the bass | Done |
 | C6 | Per-level backgrounds | Could | 30 | — | Each level sets its own backdrop (e.g. a red stage glow for III, no metronome in V) | Done |
 | C5 | Exported builds | Could | 20 | — | Windows, macOS and Linux exports launch | Not started |

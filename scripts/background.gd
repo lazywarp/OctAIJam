@@ -10,6 +10,7 @@ const THEMES := {
 	"fortissimo": {clear = Color("1c0c14"), ink = Color(1.0, 0.82, 0.72)},
 	"dacapo": {clear = Color("0b1d24"), ink = Color(0.8, 1.0, 0.96)},
 	"accelerando": {clear = Color("201420"), ink = Color(1.0, 0.92, 0.78)},
+	"finale": {clear = Color("1a0f22"), ink = Color(1.0, 0.9, 0.8)},
 }
 
 var main
@@ -63,6 +64,8 @@ func _draw() -> void:
 			_draw_dacapo(vp, cam)
 		"accelerando":
 			_draw_accelerando(vp, cam)
+		"finale":
+			_draw_finale(vp, pulse)
 
 	# The corner metronome; in Accelerando it has come loose and become the pendulums.
 	if _theme != "accelerando":
@@ -193,3 +196,33 @@ func _draw_accelerando(vp: Vector2, cam: Vector2) -> void:
 		draw_polygon(PackedVector2Array([
 			Vector2(x, y - 2.0), Vector2(x + ln, y - 0.5), Vector2(x + ln, y + 0.5), Vector2(x, y + 2.0)
 		]), PackedColorArray([head, tail, tail, head]))
+
+
+# VI: the last curtain call. A crimson valance along the top, warm footlights that
+# swell on the beat, and slow gold confetti drifting down.
+func _draw_finale(vp: Vector2, pulse: float) -> void:
+	_draw_band(vp.y * 0.55, vp.y, vp.x, Color(1.0, 0.72, 0.3, 0.0), Color(1.0, 0.7, 0.3, 0.1 + 0.03 * pulse))
+	# Valance: a strip with scalloped swags hanging below it.
+	var red := Color(0.75, 0.12, 0.2, 0.16)
+	draw_rect(Rect2(0, 0, vp.x, 18.0), red)
+	var swag := 160.0
+	for i in ceili(vp.x / swag) + 1:
+		var x0 := i * swag
+		var pts := PackedVector2Array([Vector2(x0, 17.0)])
+		for k in 9:
+			var u := float(k) / 8.0
+			pts.append(Vector2(x0 + u * swag, 18.0 + sin(u * PI) * 26.0))
+		draw_colored_polygon(pts, red)
+		# A small tassel where two swags meet.
+		draw_line(Vector2(x0, 18.0), Vector2(x0, 40.0), Color(1.0, 0.8, 0.4, 0.14), 2.0)
+		draw_circle(Vector2(x0, 42.0), 3.0, Color(1.0, 0.8, 0.4, 0.14))
+	# Confetti: small gold flecks falling and turning; each has a fixed lane and speed.
+	for i in 28:
+		var speed := 22.0 + float(i % 4) * 9.0
+		var fall := fposmod(_t * speed + i * 131.0, vp.y + 40.0)
+		var y := fall - 20.0
+		var x := fposmod(i * 193.0, vp.x) + sin(_t * 0.8 + i * 2.3) * 22.0
+		var turn := absf(sin(_t * 2.0 + i)) # 0..1, the fleck's apparent width as it spins
+		var a := 0.22 * clampf(fall / 80.0, 0.0, 1.0) # fade in under the valance
+		var col := Color(1.0, 0.82, 0.4, a) if i % 3 != 0 else Color(1.0, 0.55, 0.6, a)
+		draw_rect(Rect2(x - 3.0 * turn, y - 2.0, 6.0 * turn + 1.0, 4.0), col)
