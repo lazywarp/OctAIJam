@@ -80,9 +80,10 @@ func _draw() -> void:
 	for i in 4:
 		draw_circle(Vector2(0, y), (19.0 + 6.0 * k) * s * (1.0 - 0.2 * i), Color(glow_col, 0.025 + 0.035 * k))
 	if type == "whole":
-		# A faint gold halo that breathes with the beat.
+		# A warm gold glow that breathes with the beat (a soft fill, not a ring, so the
+		# oval doesn't read as an eye).
 		var breathe: float = 1.0 - main.beat_phase
-		draw_arc(Vector2(0, y), 22.0 * s + 3.0 * breathe, 0.0, TAU, 40, Color(GOLD, 0.25 + 0.25 * breathe), 1.5)
+		draw_circle(Vector2(0, y), 15.0 * s, Color(GOLD, 0.06 + 0.06 * breathe))
 	draw_set_transform(Vector2(0, y), sway, Vector2.ONE)
 	_draw_glyph(s, 1.0)
 	draw_set_transform(Vector2.ZERO, 0.0, Vector2.ONE)
@@ -97,11 +98,13 @@ func _draw_glyph(s: float, a: float) -> void:
 	var ink := Color(INK, 0.85 * a)
 	var col := Color(CREAM, a)
 	if type == "whole":
-		# Wide oval with a steeply tilted opening, no stem.
-		var outer := Vector2(10.5, 6.8) * s
-		var hole := Vector2(3.6, 5.2) * s
-		_ring(Vector2.ZERO, outer + Vector2(1.8, 1.8), 0.0, hole - Vector2(1.2, 1.2), 0.55, ink)
-		_ring(Vector2.ZERO, outer, 0.0, hole, 0.55, col)
+		# Wide gold-cream oval with a narrow, steeply slanted opening, no stem: thick
+		# sides and a slim slot read as a whole note, not an eye.
+		var outer := Vector2(11.0, 6.6) * s
+		var hole := Vector2(2.4, 4.6) * s
+		var gold := Color(CREAM.lerp(GOLD, 0.45), a)
+		_ring(Vector2.ZERO, outer + Vector2(1.8, 1.8), 0.0, hole - Vector2(1.0, 1.0), 0.95, ink)
+		_ring(Vector2.ZERO, outer, 0.0, hole, 0.95, gold)
 		return
 
 	var head_c := Vector2(-3.0, 9.0) * s
