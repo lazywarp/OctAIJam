@@ -4,7 +4,7 @@ extends Node
 const MIX_RATE := 22050
 const VOICES := 16
 const PAD_VOICES := 6 # long pads get their own pool so they never steal ticks or jump notes
-const LENGTHS := {"tick": 0.05, "thud": 0.15, "note": 0.6, "bass": 1.0, "melt": 0.9, "sizzle": 0.5, "drip": 0.08, "pad": 2.6}
+const LENGTHS := {"tick": 0.05, "thud": 0.15, "note": 0.6, "bass": 1.0, "melt": 0.9, "sizzle": 0.5, "drip": 0.08, "pad": 2.6, "chime": 0.5, "refreeze": 0.7}
 const PAD_ATTACK := 0.25
 const PAD_RELEASE := 0.9
 
@@ -78,6 +78,19 @@ func _sample(kind: String, freq: float) -> AudioStreamWAV:
 				# Water drop: sine whose pitch sweeps up fast, with a quick decay.
 				phase += TAU * freq * (1.0 + 1.5 * minf(1.0, t / 0.03)) / MIX_RATE
 				s = sin(phase) * exp(-t * 55.0) * 0.5 * minf(1.0, t * 1000.0)
+			"chime":
+				# Two-note sparkle: freq, then a fifth above 70 ms later. Bell-ish inharmonic partial.
+				var hi := 1.4983
+				s = (sin(TAU * freq * t) + 0.3 * sin(TAU * freq * 2.76 * t)) * exp(-t * 14.0)
+				if t > 0.07:
+					var u := t - 0.07
+					s += (sin(TAU * freq * hi * u) + 0.3 * sin(TAU * freq * hi * 2.76 * u)) * exp(-u * 10.0)
+				s *= 0.3 * minf(1.0, t * 400.0)
+			"refreeze":
+				# Crystalline upward sweep with a shimmering octave, ending on a soft ring.
+				phase += TAU * freq * (0.6 + 0.6 * minf(1.0, t / 0.25)) / MIX_RATE
+				s = sin(phase) + 0.4 * sin(phase * 2.0) * (0.5 + 0.5 * sin(TAU * 18.0 * t))
+				s *= exp(-t * 4.5) * 0.35 * minf(1.0, t * 300.0)
 			"pad":
 				# Warm pad: sine plus a slightly detuned sine (chorus) and a touch of octave,
 				# smooth attack, gently sagging sustain, cosine release to exactly zero.

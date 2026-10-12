@@ -13,6 +13,9 @@ extends RefCounted
 ##   tempo: [[x, bpm], ...] - first time the player passes x, ease to bpm over one bar
 ##   lamp: [Rect2, ...] - heat lamps. The fixture hangs at the top of the rect and its light
 ##         fills the rect; while the cube is inside, stillness fills twice as fast (1 s melt).
+##   snow: [Vector2, ...] - refreezer snowflakes (pickup centres). Holding one (max one)
+##         cancels the next stillness melt once; hazards and falls still kill. Pickups and
+##         the held flake reset on every (re)load.
 ##   bg: backdrop theme (default "hall"): hall, syncopation, fortissimo, dacapo, accelerando.
 ##       See background.gd; accelerando has no corner metronome.
 

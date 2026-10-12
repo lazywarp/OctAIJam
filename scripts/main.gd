@@ -8,6 +8,7 @@ const HeatLampScript := preload("res://scripts/heat_lamp.gd")
 const PendulumScript := preload("res://scripts/pendulum.gd")
 const GoalScript := preload("res://scripts/goal.gd")
 const SignScript := preload("res://scripts/sign.gd")
+const SnowflakeScript := preload("res://scripts/snowflake.gd")
 const SynthScript := preload("res://scripts/synth.gd")
 const BackgroundScript := preload("res://scripts/background.gd")
 const HudScript := preload("res://scripts/hud.gd")
@@ -38,6 +39,7 @@ var bpm := DEFAULT_BPM
 var tempo_flash := 0.0 # 1 -> 0, HUD highlight after a tempo change
 var idle := 0.0
 var deaths := 0
+var has_snow := false # holding a refreezer: the next stillness melt is cancelled once
 var level_index := 0
 var level: Dictionary = {}
 var state := "title" # title, play, dying, win, end
@@ -176,7 +178,9 @@ func _process(delta: float) -> void:
 			player.heated = under_lamp()
 			_update_tempo_zones()
 			_update_drips(delta)
-			if idle >= IDLE_LIMIT:
+			if idle >= IDLE_LIMIT and has_snow:
+				_refreeze()
+			elif idle >= IDLE_LIMIT:
 				die("You stood still. You melted.")
 			elif player.position.y > float(level.get("kill_y", 900.0)):
 				die("You fell out of tune.")
@@ -396,6 +400,10 @@ func _load_level(i: int, announce: bool) -> void:
 		var hz := HazardScript.new()
 		hz.setup(self, r)
 		world.add_child(hz)
+	for p in level.get("snow", []):
+		var sf := SnowflakeScript.new()
+		sf.setup(self, p)
+		world.add_child(sf)
 	for s in level.get("signs", []):
 		var sg := SignScript.new()
 		sg.position = s[0]
@@ -414,6 +422,7 @@ func _load_level(i: int, announce: bool) -> void:
 	player.landed.connect(_on_land)
 
 	idle = 0.0
+	has_snow = false
 	_lamps.clear()
 	level_time = 0.0
 	state = "play"
@@ -428,6 +437,27 @@ func _add_platform(kind: int, rect: Rect2) -> void:
 	var p := PlatformScript.new()
 	p.setup(self, kind, rect)
 	world.add_child(p)
+
+
+## A snowflake touched the cube. Returns false (and leaves the pickup) if one is already held.
+func collect_snow() -> bool:
+	if state != "play" or has_snow:
+		return false
+	has_snow = true
+	synth.play("chime", 1567.98, -14.0) # G6
+	return true
+
+
+# The held snowflake spends itself instead of letting the cube melt from stillness.
+# Only stillness: hazards and falls still kill.
+func _refreeze() -> void:
+	has_snow = false
+	idle = 0.0
+	_drip_t = 0.0
+	player.melt = 0.0
+	player.refreeze()
+	synth.play("refreeze", 1046.5, -10.0) # C6
+	_show("Refrozen!", 1.0)
 
 
 func die(reason: String, hot := false) -> void:

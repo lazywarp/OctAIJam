@@ -1,6 +1,8 @@
 extends Node2D
 ## Screen-space UI: title, level name, stillness meter, messages, end screen.
 
+const SnowflakeScript := preload("res://scripts/snowflake.gd")
+
 var main
 var font: Font
 var _t := 0.0
@@ -81,6 +83,9 @@ func _draw_play_hud(vp: Vector2) -> void:
 	draw_rect(bar, Color(1, 1, 1, 0.5), false, 2.0)
 	if lamp:
 		draw_rect(bar.grow(3.0), Color(1.0, 0.7, 0.28, 0.6 + 0.2 * sin(_t * 6.0)), false, 2.0)
+	if main.has_snow:
+		# Held refreezer: a small snowflake at the left end of the meter panel.
+		SnowflakeScript.draw_flake(self, bar.position + Vector2(8, -15), 8.0, _t * 0.5, SnowflakeScript.ICE)
 	var label := "KEEP MOVING!" if k > 0.5 else ("UNDER THE LAMP" if lamp else "stillness")
 	var label_col := Color(1.0, 0.5, 0.4, blink) if k > 0.5 else (Color(1.0, 0.7, 0.28, 0.85) if lamp else Color(1, 1, 1, 0.5))
 	draw_string(font, Vector2(0, bar.position.y - 8.0), label, HORIZONTAL_ALIGNMENT_CENTER, vp.x, 18, label_col)

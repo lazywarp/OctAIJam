@@ -29,6 +29,7 @@ var _squash := Vector2.ONE
 var _face := 1.0
 var _time := 0.0
 var _box := StyleBoxFlat.new()
+var _frost := 0.0 # 1 -> 0 after a snowflake refreezes the cube
 
 
 func _ready() -> void:
@@ -45,6 +46,14 @@ func die(hot: bool) -> void:
 	dead = true
 	velocity = Vector2.ZERO
 	_melt_speed = 4.0 if hot else 2.4 # fully melted well before main.gd restarts
+
+
+## A snowflake saved the cube: snap back to solid with a frosty flash and ring.
+func refreeze() -> void:
+	melt = 0.0
+	_shown_melt = 0.0
+	_frost = 1.0
+	_squash = Vector2(1.2, 1.2)
 
 
 func win() -> void:
@@ -89,6 +98,7 @@ func _physics_process(delta: float) -> void:
 
 func _process(delta: float) -> void:
 	_time += delta
+	_frost = maxf(_frost - delta * 1.8, 0.0)
 	var target := 1.0 if dead else melt
 	if target > _shown_melt:
 		_shown_melt = move_toward(_shown_melt, target, delta * (_melt_speed if dead else 10.0))
@@ -126,6 +136,17 @@ func _draw() -> void:
 			var px := rect.position.x + w * (0.2 + 0.3 * i)
 			draw_circle(Vector2(px, bottom - h * 0.3 + t * h * 0.5), 1.0 + 2.5 * m,
 				Color(0.6, 0.9, 1.0, 0.8 * (1.0 - t)))
+
+	if _frost > 0.0:
+		# Frost flash over the body, and a ring of ice shards bursting outward.
+		var u := 1.0 - _frost
+		draw_rect(rect, Color(1, 1, 1, 0.75 * _frost * _frost))
+		var c := rect.get_center()
+		draw_arc(c, SIZE * (0.6 + 1.4 * u), 0.0, TAU, 40, Color(0.75, 0.95, 1.0, _frost), 3.0)
+		for i in 8:
+			var dir := Vector2.from_angle(TAU * i / 8.0 + 0.4)
+			var p := c + dir * SIZE * (0.7 + 1.6 * u)
+			draw_line(p, p + dir * 7.0 * _frost, Color(1, 1, 1, _frost), 2.0)
 
 	if h < 14.0:
 		return
