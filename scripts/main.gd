@@ -30,6 +30,20 @@ const PAD_DB := -18.0 # per pad tone; three play at once, well under ticks and j
 const BEST_PATH := "user://best_times.cfg" # section "best", key = level index
 # I - vi - IV - V, as semitones above the root.
 const CHORDS := [[0, 4, 7], [9, 12, 16], [5, 9, 12], [7, 11, 14]]
+const PLAY_STATES := ["play", "dying", "win"] # a level is running; every other state is a menu screen
+const MENU_REPEAT_DELAY := 0.4 # holding up/down: first repeat after this long...
+const MENU_REPEAT_RATE := 0.14 # ...then one step this often
+# Main menu, top to bottom. "action" is "play", "quit", or the state of the screen the item
+# opens. "soon" marks screens not built yet (M2 Free Play, L3 Custom Levels, M3 Settings):
+# to plug one in, drop its "soon", then handle its state in _process (input) and hud.gd (drawing),
+# and call _to_menu() to come back.
+const MENU := [
+	{"label": "Play", "action": "play"},
+	{"label": "Free Play", "action": "free_play", "soon": true},
+	{"label": "Custom Levels", "action": "custom_levels", "soon": true},
+	{"label": "Settings", "action": "settings", "soon": true},
+	{"label": "Quit", "action": "quit"},
+]
 
 var beat := 0
 var beat_phase := 0.0 # 0..1 progress through the current beat
@@ -42,13 +56,15 @@ var deaths := 0
 var has_snow := false # holding a refreezer: the next stillness melt is cancelled once
 var level_index := 0
 var level: Dictionary = {}
-var state := "title" # title, play, dying, win, end
+var state := "menu" # menu, play, dying, win, end (and later one per menu screen)
 var message := ""
 var message_t := 0.0
 var level_time := 0.0 # current attempt at this level; resets on death
 var run_times: Array[float] = [] # this run's clear time per level, -1 if not cleared
 var run_new_best: Array[bool] = [] # whether that clear set a new best
 var best_times: Dictionary = {} # level index -> best clear time, persisted
+var menu_index := 0 # highlighted main menu item
+var menu_flash := 0.0 # 1 -> 0, HUD pop when the highlight moves or an item is chosen
 
 var camera: Camera2D
 var world: Node2D
@@ -69,6 +85,7 @@ var _quitting := false
 var _drip_t := 0.0 # countdown to the next stillness warning drip
 var _goal: GoalScript
 var _lamps: Array[Node] = [] # heat lamps the current player is standing in
+var _menu_hold := 0.0 # countdown to the next auto-repeat step while up/down is held
 
 
 func _ready() -> void:
@@ -107,7 +124,7 @@ func _ready() -> void:
 	hud.main = self
 	hud_layer.add_child(hud)
 
-	# For testing: `godot --path . -- --level 5` skips the title and starts at that level.
+	# For testing: `godot --path . -- --level 5` skips the menu and starts at that level.
 	var args := OS.get_cmdline_user_args()
 	var at := args.find("--level")
 	if at >= 0 and at + 1 < args.size():
@@ -119,11 +136,16 @@ func _setup_input() -> void:
 	_add_action("move_left", [KEY_LEFT, KEY_A], [JOY_BUTTON_DPAD_LEFT], -1.0)
 	_add_action("move_right", [KEY_RIGHT, KEY_D], [JOY_BUTTON_DPAD_RIGHT], 1.0)
 	_add_action("jump", [KEY_SPACE, KEY_UP, KEY_W, KEY_Z], [JOY_BUTTON_A], 0.0)
+	# Menus. The stick needs a firm push (0.5) so a resting stick can't flicker the highlight.
+	_add_action("menu_up", [KEY_UP, KEY_W], [JOY_BUTTON_DPAD_UP], -1.0, JOY_AXIS_LEFT_Y, 0.5)
+	_add_action("menu_down", [KEY_DOWN, KEY_S], [JOY_BUTTON_DPAD_DOWN], 1.0, JOY_AXIS_LEFT_Y, 0.5)
+	_add_action("menu_select", [KEY_SPACE, KEY_ENTER, KEY_KP_ENTER], [JOY_BUTTON_A], 0.0)
 
 
-func _add_action(action: String, keys: Array, buttons: Array, stick_dir: float) -> void:
+func _add_action(action: String, keys: Array, buttons: Array, stick_dir: float,
+		axis := JOY_AXIS_LEFT_X, deadzone := 0.4) -> void:
 	if not InputMap.has_action(action):
-		InputMap.add_action(action, 0.4)
+		InputMap.add_action(action, deadzone)
 	for k in keys:
 		var e := InputEventKey.new()
 		e.physical_keycode = k
@@ -134,7 +156,7 @@ func _add_action(action: String, keys: Array, buttons: Array, stick_dir: float) 
 		InputMap.action_add_event(action, j)
 	if stick_dir != 0.0:
 		var m := InputEventJoypadMotion.new()
-		m.axis = JOY_AXIS_LEFT_X
+		m.axis = axis
 		m.axis_value = stick_dir
 		InputMap.action_add_event(action, m)
 
@@ -180,11 +202,11 @@ func _process(delta: float) -> void:
 	_update_beat(delta)
 	message_t = maxf(message_t - delta, 0.0)
 	tempo_flash = maxf(tempo_flash - delta, 0.0)
+	menu_flash = maxf(menu_flash - delta * 4.0, 0.0)
 
 	match state:
-		"title":
-			if Input.is_action_just_pressed("jump"):
-				_start_game()
+		"menu":
+			_update_menu(delta)
 		"play":
 			level_time += delta
 			if _input_active():
@@ -218,7 +240,7 @@ func _process(delta: float) -> void:
 		"end":
 			_state_t -= delta
 			if _state_t <= 0.0 and Input.is_action_just_pressed("jump"):
-				_start_game()
+				_to_menu()
 
 	_update_camera(delta)
 	_pressed_this_frame = false
@@ -375,6 +397,94 @@ func _on_jump() -> void:
 
 func _on_land() -> void:
 	synth.play("thud", 110.0, -10.0)
+
+
+# --- Menu -------------------------------------------------------------------
+
+## True while a level is running (play, dying, win); false on the menu screens and the end screen.
+func is_playing() -> bool:
+	return PLAY_STATES.has(state)
+
+
+# Up/down moves the highlight (wrapping, auto-repeating while held); select runs it.
+func _update_menu(delta: float) -> void:
+	var dir := 0
+	if Input.is_action_just_pressed("menu_up"):
+		dir = -1
+		_menu_hold = MENU_REPEAT_DELAY
+	elif Input.is_action_just_pressed("menu_down"):
+		dir = 1
+		_menu_hold = MENU_REPEAT_DELAY
+	elif Input.is_action_pressed("menu_up") != Input.is_action_pressed("menu_down"):
+		_menu_hold -= delta
+		if _menu_hold <= 0.0:
+			_menu_hold = MENU_REPEAT_RATE
+			dir = -1 if Input.is_action_pressed("menu_up") else 1
+	if dir != 0:
+		menu_move(dir)
+	if Input.is_action_just_pressed("menu_select"):
+		menu_select(menu_index)
+
+
+## Step the highlight by `dir`, wrapping around the ends.
+func menu_move(dir: int) -> void:
+	menu_highlight(posmod(menu_index + dir, MENU.size()))
+
+
+## Highlight an item directly (the HUD calls this on mouse hover).
+func menu_highlight(i: int) -> void:
+	if i == menu_index:
+		return
+	menu_index = i
+	menu_flash = 1.0
+	synth.play("tick", 2093.0, -12.0) # C7 blip
+
+
+func menu_select(i: int) -> void:
+	if state != "menu":
+		return
+	menu_index = i
+	var item: Dictionary = MENU[i]
+	var action: String = item["action"]
+	if item.get("soon", false):
+		synth.play("thud", 196.0, -8.0)
+		_show("%s: coming soon" % item["label"], 1.4)
+		return
+	menu_flash = 1.0
+	synth.play("chime", 1046.5, -10.0) # C6
+	match action:
+		"play":
+			_start_game()
+		"quit":
+			_quit()
+		_:
+			_open_screen(action)
+
+
+# Switch to a menu screen; its state name is its MENU action.
+func _open_screen(screen: String) -> void:
+	state = screen
+	_state_t = 0.0
+	message_t = 0.0
+
+
+# Back to the main menu: clear away the level so the menu shows over the empty concert hall.
+func _to_menu() -> void:
+	state = "menu"
+	message_t = 0.0
+	if world:
+		world.queue_free()
+		world = null
+	player = null
+	_goal = null
+	_lamps.clear()
+	level = {}
+	idle = 0.0
+	set_bpm(DEFAULT_BPM)
+	_tempo_zones = []
+	camera.limit_bottom = 10000000
+	camera.position = Vector2(640, 360)
+	camera.reset_smoothing()
 
 
 # --- Flow -------------------------------------------------------------------
@@ -568,7 +678,7 @@ func _show(text: String, duration: float) -> void:
 
 
 func _update_camera(delta: float) -> void:
-	if state == "title" or not is_instance_valid(player):
+	if not is_instance_valid(player): # menu screens have no level
 		return
 	var lead := clampf(player.velocity.x * 0.35, -180.0, 180.0)
 	var target := player.position + Vector2(lead, -60.0)

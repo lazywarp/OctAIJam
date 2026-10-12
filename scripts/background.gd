@@ -31,8 +31,8 @@ func _process(delta: float) -> void:
 
 
 func _current_theme() -> String:
-	var state: String = main.state
-	if state == "title" or state == "end":
+	var playing: bool = main.is_playing()
+	if not playing: # menu screens and the end screen
 		return "hall"
 	var lvl: Dictionary = main.level
 	var theme: String = str(lvl.get("bg", "hall"))
