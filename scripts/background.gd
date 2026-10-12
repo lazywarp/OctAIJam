@@ -1,15 +1,15 @@
 extends Node2D
-## Screen-space backdrop. Every theme shares a glow, music staves and notes that pulse on
+## Screen-space backdrop. Every theme shares music staves and notes that pulse on
 ## the beat; each level picks a theme with its "bg" key and adds a small layer of its own.
 ## Keep it all faint: platforms and the ice cube must stay the most readable things.
 
-## clear: background colour, glow: the big soft circle, ink: staves, notes and metronome.
+## clear: background colour, ink: staves, notes and metronome.
 const THEMES := {
-	"hall": {clear = Color("17122b"), glow = Color(0.35, 0.15, 0.55), ink = Color(1, 1, 1)},
-	"syncopation": {clear = Color("0e1430"), glow = Color(0.16, 0.24, 0.55), ink = Color(0.85, 0.9, 1.0)},
-	"fortissimo": {clear = Color("1c0c14"), glow = Color(0.5, 0.12, 0.12), ink = Color(1.0, 0.82, 0.72)},
-	"dacapo": {clear = Color("0b1d24"), glow = Color(0.08, 0.38, 0.4), ink = Color(0.8, 1.0, 0.96)},
-	"accelerando": {clear = Color("201420"), glow = Color(0.6, 0.38, 0.12), ink = Color(1.0, 0.92, 0.78)},
+	"hall": {clear = Color("17122b"), ink = Color(1, 1, 1)},
+	"syncopation": {clear = Color("0e1430"), ink = Color(0.85, 0.9, 1.0)},
+	"fortissimo": {clear = Color("1c0c14"), ink = Color(1.0, 0.82, 0.72)},
+	"dacapo": {clear = Color("0b1d24"), ink = Color(0.8, 1.0, 0.96)},
+	"accelerando": {clear = Color("201420"), ink = Color(1.0, 0.92, 0.78)},
 }
 
 var main
@@ -53,8 +53,6 @@ func _draw() -> void:
 	var pulse := pow(1.0 - phase, 3.0)
 	var th: Dictionary = THEMES[_theme]
 	var ink: Color = th.ink
-
-	draw_circle(Vector2(vp.x * 0.5, vp.y * 0.6), vp.y * 0.7, Color(th.glow, 0.16 + 0.05 * pulse))
 
 	match _theme:
 		"syncopation":
