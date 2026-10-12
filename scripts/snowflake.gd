@@ -71,7 +71,10 @@ func _draw() -> void:
 		return
 
 	var c := Vector2(0, sin(_t * 2.2) * 4.0)
-	draw_circle(c, RADIUS + 9.0 + 2.0 * sin(_t * 3.0), Color(BLUE, 0.12))
+	# Soft icy glow: two light rings so it reads as a glow, not a dark disc.
+	var pulse := 2.0 * sin(_t * 3.0)
+	draw_circle(c, RADIUS + 12.0 + pulse, Color(ICE, 0.08))
+	draw_circle(c, RADIUS + 5.0 + pulse * 0.5, Color(ICE, 0.12))
 	draw_flake(self, c, RADIUS, _t * 0.6, ICE)
 	# Soft sparkle: a small four-point glint that hops between arm tips.
 	var tip := floori(_t * 1.5) % 6
