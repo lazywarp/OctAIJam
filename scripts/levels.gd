@@ -11,6 +11,8 @@ extends RefCounted
 ##   switch_beats: beats per a/b turn (default 2)
 ##   bpm: starting tempo (default 100), restored on every (re)load
 ##   tempo: [[x, bpm], ...] - first time the player passes x, ease to bpm over one bar
+##   lamp: [Rect2, ...] - heat lamps. The fixture hangs at the top of the rect and its light
+##         fills the rect; while the cube is inside, stillness fills twice as fast (1 s melt).
 
 
 static func all() -> Array:

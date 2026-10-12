@@ -17,6 +17,7 @@ const JUMP_BUFFER := 0.12
 const INK := Color("1a1424")
 
 var melt := 0.0 # 0..1, how close to melting from standing still
+var heated := false # standing under a heat lamp (main.gd sets this)
 var dead := false
 
 var _shown_melt := 0.0
@@ -137,6 +138,15 @@ func _draw() -> void:
 	else:
 		draw_arc(Vector2(cx, eye_y + 11), 5.0, PI + 0.4, TAU - 0.4, 8, INK, 2.0)
 		draw_circle(Vector2(rect.end.x - 4, rect.position.y + 6), 3.0, Color(0.6, 0.9, 1.0))
+	if heated and not dead:
+		# Sweat drop beside the head, sliding down and fading on a loop.
+		var st := fposmod(_time * 1.2, 1.0)
+		var sp := Vector2(rect.position.x - 5.0, rect.position.y + 4.0 + st * 10.0)
+		var sc := Color(0.6, 0.9, 1.0, 1.0 - st * 0.7)
+		draw_colored_polygon(PackedVector2Array([
+			sp + Vector2(0, -6), sp + Vector2(2.6, -1), sp + Vector2(-2.6, -1)
+		]), sc)
+		draw_circle(sp, 2.8, sc)
 
 
 func _ellipse(c: Vector2, r: Vector2, col: Color) -> void:
